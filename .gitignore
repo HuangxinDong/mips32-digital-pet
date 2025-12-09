@@ -1,0 +1,29 @@
+# OS and IDE
+/.vscode
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Logs & Temp
+*.log
+*.tmp
+*.swo # SWO Trace files from debuggers
+
+# Compiled Object Files
+*.o
+
+# Executable/Binary Files
+*.elf
+*.hex
+*.bin
+*.out
+
+# For SPIM/MARS (can vary)
+*.rdata
+*.data
+*.text
+
+
+/__pycache__
