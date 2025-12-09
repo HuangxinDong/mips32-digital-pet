@@ -162,7 +162,7 @@ def handle_quit():
     print("--- simulation terminated ---")
     exit_loop() 
 
-### Extra feature1: Sick (S n)
+### Extra feature1: Sickness (S n)
 def handle_sick(n):
     print(f"Command recognized: Sick {n}.")
 
@@ -193,7 +193,7 @@ def handle_cure(n):
     display_energy_bar(current_energy, MEL)
     print("")
 
-### Extra feature3: Exam（E n）
+### Extra feature3: Exams（E n）
 def handle_Exam(n):
     print(f"Command recognized: Exam {n}.")
 
@@ -208,7 +208,7 @@ def handle_Exam(n):
     display_energy_bar(current_energy, MEL)
     print("")
 
-### Extra feature4: Learn (L n)
+### Extra feature4: Learning (L n)
 def handle_cure(n):
     print(f"Command recognized: Learn {n}.")
 
