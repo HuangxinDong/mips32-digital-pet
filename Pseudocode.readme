@@ -114,7 +114,7 @@ def handle_entertain(n):
     display_energy_bar(current_energy, MEL)
     print("")
 
-### command2.2 : pet (E n)
+### command2.2 : pet (P n)
 def handle_pet(n):
     print(f"Command recognized: Pet {n}.")
 
@@ -204,6 +204,22 @@ def handle_Exam(n):
 
     if current_energy <= 0:
         print("Error, energy level equal or less than 0. DP is dead!")
+
+    display_energy_bar(current_energy, MEL)
+    print("")
+
+### Extra feature4: Learn (L n)
+def handle_cure(n):
+    print(f"Command recognized: Learn {n}.")
+
+    increase = 2 * n 
+    print(f"Energy increased by {increase} units (2x{n}).")
+
+    current_energy += increase
+
+    if current_energy > MEL:
+        current_energy = MEL
+        print("Error, maximum energy level reached! Capped to the Max.")
 
     display_energy_bar(current_energy, MEL)
     print("")
