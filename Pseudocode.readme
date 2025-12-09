@@ -161,3 +161,49 @@ def handle_quit():
     print("Saving session... goodbye!")
     print("--- simulation terminated ---")
     exit_loop() 
+
+### Extra feature1: Sick (S n)
+def handle_sick(n):
+    print(f"Command recognized: Sick {n}.")
+
+    decrease = 4 * n 
+    print(f"Energy decreased by {decrease} units (4x{n}).")
+
+    current_energy -= decrease
+
+    if current_energy <= 0:
+        print("Error, energy level equal or less than 0. DP is dead!")
+
+    display_energy_bar(current_energy, MEL)
+    print("")
+
+### Extra feature2: Medicine (C n)
+def handle_cure(n):
+    print(f"Command recognized: Medicine {n}.")
+
+    increase = 3 * n 
+    print(f"Energy increased by {increase} units (3x{n}).")
+
+    current_energy += increase
+
+    if current_energy > MEL:
+        current_energy = MEL
+        print("Error, maximum energy level reached! Capped to the Max.")
+
+    display_energy_bar(current_energy, MEL)
+    print("")
+
+### Extra feature3: Exam（E n）
+def handle_Exam(n):
+    print(f"Command recognized: Exam {n}.")
+
+    decrease = 5 * n 
+    print(f"Energy increased by {increase} units (5x{n}).")
+
+    current_energy += increase
+
+    if current_energy <= 0:
+        print("Error, energy level equal or less than 0. DP is dead!")
+
+    display_energy_bar(current_energy, MEL)
+    print("")
