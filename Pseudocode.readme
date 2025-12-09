@@ -19,7 +19,7 @@ if user_input == "":
 else:
     MEL = integer(user_input)
 
-print "Enter Initial Energy Level (IEL) [Default: 5]: "
+print("Enter Initial Energy Level (IEL) [Default: 5]: ")
 user_input = read()
 if user_input == "":
     IEL = 5
@@ -40,7 +40,7 @@ print("")
 ### Main Interaction loop 
 while True:
     wait(1)     # simulate time passing
-    current_energy = current_energy - EDR
+    current_energy -= EDR
     print("Time +1s... Natural energy depletion!")
 
     if current_energy <= 0:
@@ -48,9 +48,8 @@ while True:
         print("Error, energy level equal or less than 0. DP is dead!")
         display_energy_bar(current_energy, MEL) # Pet remains dead until reset, but user can still type commands
         print("*** Your Digital Pet has died! ***")
-    elif command == "Q":
-        handle_quit()
-        break
+        print("")
+        continue
     
     display_energy_bar(current_energy, MEL)
     print("")
@@ -77,7 +76,7 @@ while True:
         handle_reset()
 
     elif command == "Q":
-        print("Quitting the application...")
+        handle_quit()
         break
 
     else:
