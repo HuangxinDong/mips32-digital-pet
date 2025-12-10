@@ -1,0 +1,225 @@
+### 1. application startup and initial configuration
+
+print("=== Digital Pet Simulator (MIPS32) ===")
+print("Initializing system...")
+
+print ("Please set parameters(press Enter for default): ")
+
+print ("Enter Natural Energy Depletion Rate (EDR) [Default: 1]: ")
+user_input = read()
+if user_input == "":
+    EDR = 1
+else:
+    EDR = integer(user_input)    
+
+print "Enter Maximum Energy Level (MEL) [Default: 15]: "
+user_input = read()
+if user_input == "":
+    MEL = 15
+else:
+    MEL = integer(user_input)
+
+print("Enter Initial Energy Level (IEL) [Default: 5]: ")
+user_input = read()
+if user_input == "":
+    IEL = 5
+else:
+    IEL = integer(user_input)
+
+print "Parameters set successfully!"
+print "-EDR: ", EDR，"units/sec"
+print "-MEL: ", MEL, "units"
+print "-IEL: ", IEL, "units"
+
+current_energy = IEL
+
+print("Your Digital Pet is alive! Current status:")
+display_energy_bar(current_energy, MEL)
+print("")
+
+### Main Interaction loop 
+while True:
+    wait(1)     # simulate time passing
+    current_energy -= EDR
+    print("Time +1s... Natural energy depletion!")
+
+    if current_energy <= 0:
+        current_energy = 0
+        print("Error, energy level equal or less than 0. DP is dead!")
+        display_energy_bar(current_energy, MEL) # Pet remains dead until reset, but user can still type commands
+        print("*** Your Digital Pet has died! ***")
+        print("")
+        continue
+    
+    display_energy_bar(current_energy, MEL)
+    print("")
+
+    print("Enter a command (F, E, P, I, R, Q):")
+    user_input = read()
+
+    command = first_character(user_input)
+    n = parse_integer_after_space(user_input)
+
+    if command == "F":
+        handle_feed(n)
+
+    elif command == "E":
+        handle_entertain(n)
+
+    elif command == "P":
+        handle_pet(n)
+
+    elif command == "I":
+        handle_ignore(n)
+
+    elif command == "R":
+        handle_reset()
+
+    elif command == "Q":
+        handle_quit()
+        break
+
+    else:
+        print("Invalid command! Please try again.")
+
+### command1: feed (F n)
+ def handle_feed(n):
+    print(f"Command recognized: Feed {n}.")
+    increase = n 
+
+    print(f"Energy increased by {n} units.")
+
+    current_energy += n
+
+    if current_energy > MEL:
+        current_energy = MEL
+        print("Error, maximum energy level reached! Capped to the Max.")
+
+    display_energy_bar(current_energy, MEL)
+    print("")
+
+### command2.1 : entertain (E n)
+def handle_entertain(n):
+    print(f"Command recognized: Entertain {n}.")
+
+    increase = 2 * n 
+    print(f"Energy increased by {increase} units (2x{n}).")
+
+    current_energy += increase
+
+    if current_energy > MEL:
+        current_energy = MEL
+        print("Error, maximum energy level reached! Capped to the Max.")
+
+    display_energy_bar(current_energy, MEL)
+    print("")
+
+### command2.2 : pet (P n)
+def handle_pet(n):
+    print(f"Command recognized: Pet {n}.")
+
+    increase. = 2 * n 
+    print(f"Energy increased by {increase} units (2x{n}).")
+
+    current_energy += increase
+
+    if current_energy > MEL:
+        current_energy = MEL
+        print("Error, maximum energy level reached! Capped to the Max.")
+
+    display_energy_bar(current_energy, MEL)
+    print("")
+
+### command3: ignore (I n)
+def handle_ignore(n):
+    print(f"Command recognized: Ignore {n}.")
+
+    decrease = 3 * n 
+    print(f"Energy decreased by {decrease} units (3x{n}).")
+
+    current_energy -= decrease
+
+    if current_energy <= 0:
+        print("Error, energy level equal or less than 0. DP is dead!")
+
+    display_energy_bar(current_energy, MEL)
+    print("")
+
+### command4: reset (R n)
+def handle_reset():
+    print("Command recognized: Reset.")
+
+    current_energy = IEL
+    print("Digital Pet has been reset to its initial state!")
+
+    display_energy_bar(current_energy, MEL)
+    print("")
+
+### command5: quit (Q)
+def handle_quit():
+    print("Command recognized: Quit.")
+    print("Saving session... goodbye!")
+    print("--- simulation terminated ---")
+    exit_loop() 
+
+### Extra feature1: Sickness (S n)
+def handle_sick(n):
+    print(f"Command recognized: Sick {n}.")
+
+    decrease = 4 * n 
+    print(f"Energy decreased by {decrease} units (4x{n}).")
+
+    current_energy -= decrease
+
+    if current_energy <= 0:
+        print("Error, energy level equal or less than 0. DP is dead!")
+
+    display_energy_bar(current_energy, MEL)
+    print("")
+
+### Extra feature2: Medicine (C n)
+def handle_cure(n):
+    print(f"Command recognized: Medicine {n}.")
+
+    increase = 3 * n 
+    print(f"Energy increased by {increase} units (3x{n}).")
+
+    current_energy += increase
+
+    if current_energy > MEL:
+        current_energy = MEL
+        print("Error, maximum energy level reached! Capped to the Max.")
+
+    display_energy_bar(current_energy, MEL)
+    print("")
+
+### Extra feature3: Exams（E n）
+def handle_Exam(n):
+    print(f"Command recognized: Exam {n}.")
+
+    decrease = 5 * n 
+    print(f"Energy increased by {increase} units (5x{n}).")
+
+    current_energy += increase
+
+    if current_energy <= 0:
+        print("Error, energy level equal or less than 0. DP is dead!")
+
+    display_energy_bar(current_energy, MEL)
+    print("")
+
+### Extra feature4: Learning (L n)
+def handle_cure(n):
+    print(f"Command recognized: Learn {n}.")
+
+    increase = 2 * n 
+    print(f"Energy increased by {increase} units (2x{n}).")
+
+    current_energy += increase
+
+    if current_energy > MEL:
+        current_energy = MEL
+        print("Error, maximum energy level reached! Capped to the Max.")
+
+    display_energy_bar(current_energy, MEL)
+    print("")
