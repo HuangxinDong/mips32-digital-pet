@@ -25,6 +25,8 @@
     
     # Command prompt
     msg_prompt:     .asciiz "Enter a command (F, E, P, I, R, Q) > "
+    msg_cmd_rec:    .asciiz "Command recognized: "
+
  
     # Quit messages
     msg_saving:     .asciiz "Saving session... goodbye!\n"
@@ -190,71 +192,106 @@ read_config_done:
 # COMMAND PARSING
 
 parse_command:
+    # Save return address bc of jal
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+
     la $t0, input_buffer
     lb $t1, 0($t0)
+    addi $a0, $t0, 1
 
     li $t2, 'F'
-    beq $t1, $t2, feed
+    beq $t1, $t2, do_feed
 
     li $t2, 'E'
-    beq $t1, $t2, entertain
+    beq $t1, $t2, do_entertain
 
     li $t2, 'P'
-    beq $t1, $t2, pet
+    beq $t1, $t2, do_pet
 
     li $t2, 'I'
-    beq $t1, $t2, ignore
+    beq $t1, $t2, do_ignore
 
     li $t2, 'R'
-    beq $t1, $t2, reset
+    beq $t1, $t2, do_reset
 
     li $t2, 'Q'
-    beq $t1, $t2, quit
+    beq $t1, $t2, do_quit
 
+    # Invalid command
+    j parse_done
+
+
+do_feed:
+    jal feed
+    j parse_done
+
+do_entertain:
+    jal entertain
+    j parse_done
+
+do_pet:
+    jal pet
+    j parse_done
+
+do_ignore:
+    jal ignore
+    j parse_done
+
+do_reset:
+    jal reset
+    j parse_done
+
+do_quit:
+    jal handle_quit
+    j parse_done
 
 parse_done:
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
     jr $ra
 
 
 # EXECUTE COMANDS
 
-# test successfully parsed
-# feel free to delete this lol
+# just to test successfully parsed
+# feel free to delete/change this lol
 feed:
     li $v0, 4
-    la $a0, msg_alive
+    la $a0, msg_cmd_rec
     syscall
-    j parse_done
+    jr $ra
 
 entertain:
     li $v0, 4
-    la $a0, msg_alive
+    la $a0, msg_cmd_rec
     syscall
-    j parse_done
+    jr $ra
 
 pet:
     li $v0, 4
-    la $a0, msg_alive
+    la $a0, msg_cmd_rec
     syscall
-    j parse_done
+    jr $ra
 
 ignore:
     li $v0, 4
-    la $a0, msg_alive
+    la $a0, msg_cmd_rec
     syscall
-    j parse_done
+    jr $ra
 
 reset:
     li $v0, 4
-    la $a0, msg_alive
+    la $a0, msg_cmd_rec
     syscall
-    j parse_done
+    jr $ra
 
 quit:
     li $v0, 4
-    la $a0, msg_alive
+    la $a0, msg_cmd_rec
     syscall
-    j parse_done
+    li $v0, 10          # Exit program
+    syscall
 
 
 # TIMING FUNCTIONS
