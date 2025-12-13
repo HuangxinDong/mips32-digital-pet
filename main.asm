@@ -3,6 +3,7 @@
     MEL:            .word   15          # Maximum Energy Level
     IEL:            .word   10          # Initial Energy Level
     current_energy: .word   10          # Current energy (initialized to IEL)
+    input_buffer:   .space  12          # A buffer for the input string
     
     # Startup messages
     msg_title:      .asciiz "=== Digital Pet Simulator (MIPS32) ===\n"
@@ -55,6 +56,11 @@ main:
     li $t9, 10
     jal read_config
     
+    # Initialise current_energy with IEL
+    lw $t0, IEL
+    sw $t0, current_energy
+
+    # Print end of startup messages
     li $v0, 4
     la $a0, msg_params_set
     syscall
@@ -65,28 +71,41 @@ main_loop:
     
 
 # INITIALIZE SYSTEM
+#   $a0: prompt address, $a1: variable address, $t9: default value
 
 read_config:
-    # print prompt in a0
+    # Preserve registers
+    move $s1, $a1
+
+    # print prompt in reg $a0
     li $v0, 4
     syscall
 
-    # get user input
-    li $v0, 5
+    # get user input as string (syscall 8 with an input buffer)
+    li $v0, 8
+    la $a0, input_buffer
+    li $a1, 12
     syscall
 
-    # move user input into register $t0
-    move $t0, $v0
+    # Check for "\n or no input"
+    la $t2, input_buffer
+    lb $t0, 0($t2)
+
+    li $t1, 10
+    beq $t0, $t1, use_default
 
     li $t1, 0
     beq $t0, $t1, use_default
 
-    # store value into address at register $a1
-    sw $t0, ($a1)
+    # Convert input into int
+    la $a0, input_buffer
+    jal str_to_int
+
+    sw $v0, ($s1)
     j read_config_done
 
 use_default:
-    sw $t9, ($a1)
+    sw $t9, ($s1)
 
 read_config_done:
     jr $ra
@@ -122,3 +141,42 @@ print_char:
     li      $v0, 11
     syscall
     jr      $ra
+
+# ========================================
+# str_to_int
+#   converts ascii strings to integers
+#   [!] This won't handle non-int strings
+# ========================================
+
+str_to_int:
+    # Update stack pointer
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+
+    li $v0, 0
+    li $t1, 0
+    li $t2, 10
+    li $t4, 48
+
+str_to_int_loop:
+    lb $t0, ($a0)
+
+    li $t3, 0
+    beq $t0, $t3, str_to_int_done
+
+    li $t3, 10
+    beq $t0, $t3, str_to_int_done
+
+    sub $t0, $t0, $t4
+
+    mul $v0, $v0, $t2
+    add $v0, $v0, $t0
+
+    addi $a0, $a0, 1
+    j str_to_int_loop
+
+str_to_int_done:
+    # Restore Stack Pointer
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr $ra
