@@ -26,7 +26,7 @@
     # Command prompt
     msg_prompt:     .asciiz "Enter a command (F, E, P, I, R, Q) > "
     
-    # Command responses
+    # Command recognized messages
     msg_cmd_feed:   .asciiz "Command recognized: Feed "
     msg_cmd_enter:  .asciiz "Command recognized: Entertain "
     msg_cmd_pet:    .asciiz "Command recognized: Pet "
@@ -36,6 +36,10 @@
     newline:        .asciiz "\n"
     msg_cmd_rec:    .asciiz "Command recognized: "
 
+    # Reset and Ignore messages
+    msg_reset_done:     .asciiz "Digital Pet has been reset to its initial state!\n"
+    msg_ignore_loss:    .asciiz "Energy decreased by "
+    msg_ignore_result:  .asciiz "Current energy: "
  
     # Quit messages
     msg_saving:     .asciiz "Saving session... goodbye!\n"
@@ -57,7 +61,7 @@ main:
     la $a0, msg_params
     syscall
 
-    # Get EDR Config
+    # Get EDR config
     la $a1, EDR
     la $a0, msg_edr_prompt
     li $t9, 1
@@ -307,15 +311,65 @@ pet:
     jr $ra
 
 ignore:
+    move $t0, $a0 # t0 = n
     li $v0, 4
     la $a0, msg_cmd_ignore
     syscall
+
+    li $v0, 4
+    la $a0, newline
+    syscall
+
+    li $t1, 3
+    mul $t2, $t0, $t1 # t2(damage) = n * 3
+    
+    lw $t3, current_energy
+    sub $t3, $t3, $t2 # t3 = new energy
+    sw $t3, current_energy
+
+    li $v0, 4
+    la $a0, msg_ignore_loss
+    syscall
+
+    move $a0, $t2
+    li $v0, 1 # damage amount
+    syscall
+
+    li $v0, 4
+    la $a0, newline
+    syscall
+
+    li $v0, 4
+    la $a0, msg_ignore_result
+    syscall
+
+    lw $a0, current_energy
+    li $v0, 1
+    syscall
+
+    li $v0, 4
+    la $a0, newline
+    syscall
+
     jr $ra
 
 reset:
     li $v0, 4
     la $a0, msg_cmd_reset
     syscall
+
+    li $v0, 4
+    la $a0, newline
+    syscall
+    
+    # current_energy = IEL
+    lw $t0, IEL
+    sw $t0, current_energy
+    
+    li $v0, 4
+    la $a0, msg_reset_done
+    syscall
+    
     jr $ra
 
 quit:
