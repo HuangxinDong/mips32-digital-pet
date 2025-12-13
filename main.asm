@@ -25,6 +25,15 @@
     
     # Command prompt
     msg_prompt:     .asciiz "Enter a command (F, E, P, I, R, Q) > "
+    
+    # Command responses
+    msg_cmd_feed:   .asciiz "Command recognized: Feed "
+    msg_cmd_enter:  .asciiz "Command recognized: Entertain "
+    msg_cmd_pet:    .asciiz "Command recognized: Pet "
+    msg_cmd_ignore: .asciiz "Command recognized: Ignore "
+    msg_cmd_reset:  .asciiz "Command recognized: Reset "
+    msg_cmd_quit:   .asciiz "Command recognized: Quit "
+    newline:        .asciiz "\n"
     msg_cmd_rec:    .asciiz "Command recognized: "
 
  
@@ -192,63 +201,86 @@ read_config_done:
 # COMMAND PARSING
 
 parse_command:
-    # Save return address bc of jal
-    addi $sp, $sp, -4
-    sw $ra, 0($sp)
+    addi $sp, $sp, -12
+    sw $ra, 8($sp)
+    sw $s0, 4($sp) # command char
+    sw $s1, 0($sp) # argument value
 
     la $t0, input_buffer
+    lb $s0, 0($t0)
+    
+    # move pointer
+    addi $t0, $t0, 1    
+
+skip_spaces:
     lb $t1, 0($t0)
-    addi $a0, $t0, 1
+    li $t2, 32 # 32 is space
+    bne $t1, $t2, parse_arg
+    addi $t0, $t0, 1 # move pointer
+    j skip_spaces
+
+parse_arg:
+    move $a0, $t0
+    jal str_to_int
+    move $s1, $v0 # save integer to $s1
 
     li $t2, 'F'
-    beq $t1, $t2, do_feed
+    beq $s0, $t2, do_feed
 
     li $t2, 'E'
-    beq $t1, $t2, do_entertain
+    beq $s0, $t2, do_entertain
 
     li $t2, 'P'
-    beq $t1, $t2, do_pet
+    beq $s0, $t2, do_pet
 
     li $t2, 'I'
-    beq $t1, $t2, do_ignore
+    beq $s0, $t2, do_ignore
 
     li $t2, 'R'
-    beq $t1, $t2, do_reset
+    beq $s0, $t2, do_reset
 
     li $t2, 'Q'
-    beq $t1, $t2, do_quit
+    beq $s0, $t2, do_quit
 
     # Invalid command
     j parse_done
 
 
 do_feed:
+    move $a0, $s1
     jal feed
     j parse_done
 
 do_entertain:
+    move $a0, $s1
     jal entertain
     j parse_done
 
 do_pet:
+    move $a0, $s1
     jal pet
     j parse_done
 
 do_ignore:
+    move $a0, $s1
     jal ignore
     j parse_done
 
 do_reset:
+    move $a0, $s1
     jal reset
     j parse_done
 
 do_quit:
-    jal handle_quit
+    move $a0, $s1
+    jal quit
     j parse_done
 
 parse_done:
-    lw $ra, 0($sp)
-    addi $sp, $sp, 4
+    lw $s1, 0($sp)
+    lw $s0, 4($sp)
+    lw $ra, 8($sp)
+    addi $sp, $sp, 12
     jr $ra
 
 
@@ -258,39 +290,39 @@ parse_done:
 # feel free to delete/change this lol
 feed:
     li $v0, 4
-    la $a0, msg_cmd_rec
+    la $a0, msg_cmd_feed
     syscall
     jr $ra
 
 entertain:
     li $v0, 4
-    la $a0, msg_cmd_rec
+    la $a0, msg_cmd_enter
     syscall
     jr $ra
 
 pet:
     li $v0, 4
-    la $a0, msg_cmd_rec
+    la $a0, msg_cmd_pet
     syscall
     jr $ra
 
 ignore:
     li $v0, 4
-    la $a0, msg_cmd_rec
+    la $a0, msg_cmd_ignore
     syscall
     jr $ra
 
 reset:
     li $v0, 4
-    la $a0, msg_cmd_rec
+    la $a0, msg_cmd_reset
     syscall
     jr $ra
 
 quit:
     li $v0, 4
-    la $a0, msg_cmd_rec
+    la $a0, msg_terminated
     syscall
-    li $v0, 10          # Exit program
+    li $v0, 10 # exit program
     syscall
 
 
