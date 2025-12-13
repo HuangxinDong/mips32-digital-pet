@@ -13,6 +13,14 @@
     msg_mel_prompt: .asciiz "Enter Maximum Energy Level (MEL) [Default: 15]: "
     msg_iel_prompt: .asciiz "Enter Initial Energy Level (IEL) [Default: 10]: "
     msg_params_set: .asciiz "Parameters set successfully!\n"
+    
+    # Parameters Strings
+    msg_edr_info:   .asciiz "- EDR: "
+    msg_mel_info:   .asciiz "- MEL: "
+    msg_iel_info:   .asciiz "- IEL: "
+    msg_units:      .asciiz " units\n"
+    msg_units_sec:  .asciiz " units/sec\n"
+
     msg_alive:      .asciiz "Your Digital Pet is alive! Current status:\n"
     
     # Command prompt
@@ -64,6 +72,48 @@ main:
     li $v0, 4
     la $a0, msg_params_set
     syscall
+
+    # Echo Parameters
+    # Print EDR
+    li $v0, 4
+    la $a0, msg_edr_info
+    syscall
+    
+    li $v0, 1
+    lw $a0, EDR
+    syscall
+    
+    li $v0, 4
+    la $a0, msg_units_sec
+    syscall
+
+    # Print MEL
+    li $v0, 4
+    la $a0, msg_mel_info
+    syscall
+    
+    li $v0, 1
+    lw $a0, MEL
+    syscall
+    
+    li $v0, 4
+    la $a0, msg_units
+    syscall
+
+    # Print IEL
+    li $v0, 4
+    la $a0, msg_iel_info
+    syscall
+    
+    li $v0, 1
+    lw $a0, IEL
+    syscall
+    
+    li $v0, 4
+    la $a0, msg_units
+    syscall
+
+    
     
 # Main game loop
 
