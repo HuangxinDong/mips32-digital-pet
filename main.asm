@@ -71,10 +71,16 @@ main_loop:
     
 
 # INITIALIZE SYSTEM
+
+# ========================================
+# read_config
 #   $a0: prompt address, $a1: variable address, $t9: default value
+# ========================================
 
 read_config:
-    # Preserve registers
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+
     move $s1, $a1
 
     # print prompt in reg $a0
@@ -101,6 +107,9 @@ read_config:
     la $a0, input_buffer
     jal str_to_int
 
+    li $t1, -1
+    beq $v0, $t1, use_default
+
     sw $v0, ($s1)
     j read_config_done
 
@@ -108,6 +117,8 @@ use_default:
     sw $t9, ($s1)
 
 read_config_done:
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
     jr $ra
 
 # COMMAND PARSING AND EXECUTION
@@ -157,23 +168,33 @@ str_to_int:
     li $t1, 0
     li $t2, 10
     li $t4, 48
+    li $t5, 57
 
 str_to_int_loop:
     lb $t0, ($a0)
 
+    # Check terminators
     li $t3, 0
     beq $t0, $t3, str_to_int_done
 
     li $t3, 10
     beq $t0, $t3, str_to_int_done
 
-    sub $t0, $t0, $t4
+    # Check bounds
+    blt $t0, $t4, return_error
+    bgt $t0, $t5, return_error
 
+    # Convert ASCII to INT
+    sub $t0, $t0, $t4
     mul $v0, $v0, $t2
     add $v0, $v0, $t0
 
     addi $a0, $a0, 1
     j str_to_int_loop
+
+return_error:
+    li $v0, -1
+    j str_to_int_done
 
 str_to_int_done:
     # Restore Stack Pointer
