@@ -33,6 +33,7 @@
     msg_cmd_ignore: .asciiz "Command recognized: Ignore "
     msg_cmd_reset:  .asciiz "Command recognized: Reset "
     msg_cmd_quit:   .asciiz "Command recognized: Quit "
+    msg_cmd_invalid: .asciiz "Invalid command! Please try again."
     newline:        .asciiz "\n"
     msg_cmd_rec:    .asciiz "Command recognized: "
 
@@ -224,10 +225,22 @@ skip_spaces:
     j skip_spaces
 
 parse_arg:
+    # Check empty argument
+    lb $t1, 0($t0)
+    li $t2, 10 # \n
+    beq $t1, $t2, use_default_arg
+    li $t2, 0 # null
+    beq $t1, $t2, use_default_arg
+
     move $a0, $t0
     jal str_to_int
     move $s1, $v0 # save integer to $s1
+    j check_cmd_type
 
+use_default_arg:
+    li $s1, 1 # n=1
+
+check_cmd_type:
     li $t2, 'F'
     beq $s0, $t2, do_feed
 
@@ -247,6 +260,11 @@ parse_arg:
     beq $s0, $t2, do_quit
 
     # Invalid command
+    li $v0, 4
+    la $a0, msg_cmd_invalid
+    syscall
+    la $a0, newline
+    syscall
     j parse_done
 
 
