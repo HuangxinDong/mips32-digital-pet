@@ -1,8 +1,8 @@
 .data
-    EDR:        .word   1           # Energy Depletion Rate (units/sec)
-    MEL:        .word   15          # Maximum Energy Level
-    IEL:        .word   10          # Initial Energy Level
-    current_energy: .word 10        # Current energy (initialized to IEL)
+    EDR:            .word   1           # Energy Depletion Rate (units/sec)
+    MEL:            .word   15          # Maximum Energy Level
+    IEL:            .word   10          # Initial Energy Level
+    current_energy: .word   10          # Current energy (initialized to IEL)
     
     # Startup messages
     msg_title:      .asciiz "=== Digital Pet Simulator (MIPS32) ===\n"
@@ -28,8 +28,36 @@
 # MAIN PROGRAM
 
 main:
-    # Initialize system
+    # Print startup messages
+    li $v0, 4
+    la $a0, msg_title
+    syscall
+    la $a0, msg_init
+    syscall
+    la $a0, msg_params
+    syscall
+
+    # Get EDR Config
+    la $a1, EDR
+    la $a0, msg_edr_prompt
+    li $t9, 1
+    jal read_config
+
+    # Get MEL config
+    la $a1, MEL
+    la $a0, msg_mel_prompt
+    li $t9, 15
+    jal read_config
+
+    # Get IEL config
+    la $a1, IEL
+    la $a0, msg_iel_prompt
+    li $t9, 10
+    jal read_config
     
+    li $v0, 4
+    la $a0, msg_params_set
+    syscall
     
 # Main game loop
 
@@ -38,7 +66,30 @@ main_loop:
 
 # INITIALIZE SYSTEM
 
+read_config:
+    # print prompt in a0
+    li $v0, 4
+    syscall
 
+    # get user input
+    li $v0, 5
+    syscall
+
+    # move user input into register $t0
+    move $t0, $v0
+
+    li $t1, 0
+    beq $t0, $t1, use_default
+
+    # store value into address at register $a1
+    sw $t0, ($a1)
+    j read_config_done
+
+use_default:
+    sw $t9, ($a1)
+
+read_config_done:
+    jr $ra
 
 # COMMAND PARSING AND EXECUTION
 
