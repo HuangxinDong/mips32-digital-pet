@@ -118,7 +118,23 @@ main:
 # Main game loop
 
 main_loop:
-    
+    # Print command prompt
+    li $v0, 4
+    la $a0, msg_prompt
+    syscall
+
+    # Read command input
+    li $v0, 8
+    la $a0, input_buffer
+    li $a1, 12
+    syscall
+
+    jal parse_command
+
+    j main_loop # while loop
+
+
+
 
 # INITIALIZE SYSTEM
 
@@ -171,8 +187,74 @@ read_config_done:
     addi $sp, $sp, 4
     jr $ra
 
-# COMMAND PARSING AND EXECUTION
+# COMMAND PARSING
 
+parse_command:
+    la $t0, input_buffer
+    lb $t1, 0($t0)
+
+    li $t2, 'F'
+    beq $t1, $t2, feed
+
+    li $t2, 'E'
+    beq $t1, $t2, entertain
+
+    li $t2, 'P'
+    beq $t1, $t2, pet
+
+    li $t2, 'I'
+    beq $t1, $t2, ignore
+
+    li $t2, 'R'
+    beq $t1, $t2, reset
+
+    li $t2, 'Q'
+    beq $t1, $t2, quit
+
+
+parse_done:
+    jr $ra
+
+
+# EXECUTE COMANDS
+
+# test successfully parsed
+# feel free to delete this lol
+feed:
+    li $v0, 4
+    la $a0, msg_alive
+    syscall
+    j parse_done
+
+entertain:
+    li $v0, 4
+    la $a0, msg_alive
+    syscall
+    j parse_done
+
+pet:
+    li $v0, 4
+    la $a0, msg_alive
+    syscall
+    j parse_done
+
+ignore:
+    li $v0, 4
+    la $a0, msg_alive
+    syscall
+    j parse_done
+
+reset:
+    li $v0, 4
+    la $a0, msg_alive
+    syscall
+    j parse_done
+
+quit:
+    li $v0, 4
+    la $a0, msg_alive
+    syscall
+    j parse_done
 
 
 # TIMING FUNCTIONS
