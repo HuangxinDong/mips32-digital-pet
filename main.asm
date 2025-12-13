@@ -13,10 +13,29 @@
     msg_mel_prompt: .asciiz "Enter Maximum Energy Level (MEL) [Default: 15]: "
     msg_iel_prompt: .asciiz "Enter Initial Energy Level (IEL) [Default: 10]: "
     msg_params_set: .asciiz "Parameters set successfully!\n"
+    
+    # Parameters Strings
+    msg_edr_info:   .asciiz "- EDR: "
+    msg_mel_info:   .asciiz "- MEL: "
+    msg_iel_info:   .asciiz "- IEL: "
+    msg_units:      .asciiz " units\n"
+    msg_units_sec:  .asciiz " units/sec\n"
+
     msg_alive:      .asciiz "Your Digital Pet is alive! Current status:\n"
     
     # Command prompt
     msg_prompt:     .asciiz "Enter a command (F, E, P, I, R, Q) > "
+    
+    # Command responses
+    msg_cmd_feed:   .asciiz "Command recognized: Feed "
+    msg_cmd_enter:  .asciiz "Command recognized: Entertain "
+    msg_cmd_pet:    .asciiz "Command recognized: Pet "
+    msg_cmd_ignore: .asciiz "Command recognized: Ignore "
+    msg_cmd_reset:  .asciiz "Command recognized: Reset "
+    msg_cmd_quit:   .asciiz "Command recognized: Quit "
+    newline:        .asciiz "\n"
+    msg_cmd_rec:    .asciiz "Command recognized: "
+
  
     # Quit messages
     msg_saving:     .asciiz "Saving session... goodbye!\n"
@@ -64,11 +83,69 @@ main:
     li $v0, 4
     la $a0, msg_params_set
     syscall
+
+    # Echo Parameters
+    # Print EDR
+    li $v0, 4
+    la $a0, msg_edr_info
+    syscall
+    
+    li $v0, 1
+    lw $a0, EDR
+    syscall
+    
+    li $v0, 4
+    la $a0, msg_units_sec
+    syscall
+
+    # Print MEL
+    li $v0, 4
+    la $a0, msg_mel_info
+    syscall
+    
+    li $v0, 1
+    lw $a0, MEL
+    syscall
+    
+    li $v0, 4
+    la $a0, msg_units
+    syscall
+
+    # Print IEL
+    li $v0, 4
+    la $a0, msg_iel_info
+    syscall
+    
+    li $v0, 1
+    lw $a0, IEL
+    syscall
+    
+    li $v0, 4
+    la $a0, msg_units
+    syscall
+
+    
     
 # Main game loop
 
 main_loop:
-    
+    # Print command prompt
+    li $v0, 4
+    la $a0, msg_prompt
+    syscall
+
+    # Read command input
+    li $v0, 8
+    la $a0, input_buffer
+    li $a1, 12
+    syscall
+
+    jal parse_command
+
+    j main_loop # while loop
+
+
+
 
 # INITIALIZE SYSTEM
 
@@ -121,8 +198,132 @@ read_config_done:
     addi $sp, $sp, 4
     jr $ra
 
-# COMMAND PARSING AND EXECUTION
+# COMMAND PARSING
 
+parse_command:
+    addi $sp, $sp, -12
+    sw $ra, 8($sp)
+    sw $s0, 4($sp) # command char
+    sw $s1, 0($sp) # argument value
+
+    la $t0, input_buffer
+    lb $s0, 0($t0)
+    
+    # move pointer
+    addi $t0, $t0, 1    
+
+skip_spaces:
+    lb $t1, 0($t0)
+    li $t2, 32 # 32 is space
+    bne $t1, $t2, parse_arg
+    addi $t0, $t0, 1 # move pointer
+    j skip_spaces
+
+parse_arg:
+    move $a0, $t0
+    jal str_to_int
+    move $s1, $v0 # save integer to $s1
+
+    li $t2, 'F'
+    beq $s0, $t2, do_feed
+
+    li $t2, 'E'
+    beq $s0, $t2, do_entertain
+
+    li $t2, 'P'
+    beq $s0, $t2, do_pet
+
+    li $t2, 'I'
+    beq $s0, $t2, do_ignore
+
+    li $t2, 'R'
+    beq $s0, $t2, do_reset
+
+    li $t2, 'Q'
+    beq $s0, $t2, do_quit
+
+    # Invalid command
+    j parse_done
+
+
+do_feed:
+    move $a0, $s1
+    jal feed
+    j parse_done
+
+do_entertain:
+    move $a0, $s1
+    jal entertain
+    j parse_done
+
+do_pet:
+    move $a0, $s1
+    jal pet
+    j parse_done
+
+do_ignore:
+    move $a0, $s1
+    jal ignore
+    j parse_done
+
+do_reset:
+    move $a0, $s1
+    jal reset
+    j parse_done
+
+do_quit:
+    move $a0, $s1
+    jal quit
+    j parse_done
+
+parse_done:
+    lw $s1, 0($sp)
+    lw $s0, 4($sp)
+    lw $ra, 8($sp)
+    addi $sp, $sp, 12
+    jr $ra
+
+
+# EXECUTE COMANDS
+
+# just to test successfully parsed
+# feel free to delete/change this lol
+feed:
+    li $v0, 4
+    la $a0, msg_cmd_feed
+    syscall
+    jr $ra
+
+entertain:
+    li $v0, 4
+    la $a0, msg_cmd_enter
+    syscall
+    jr $ra
+
+pet:
+    li $v0, 4
+    la $a0, msg_cmd_pet
+    syscall
+    jr $ra
+
+ignore:
+    li $v0, 4
+    la $a0, msg_cmd_ignore
+    syscall
+    jr $ra
+
+reset:
+    li $v0, 4
+    la $a0, msg_cmd_reset
+    syscall
+    jr $ra
+
+quit:
+    li $v0, 4
+    la $a0, msg_terminated
+    syscall
+    li $v0, 10 # exit program
+    syscall
 
 
 # TIMING FUNCTIONS
