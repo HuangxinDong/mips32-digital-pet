@@ -40,7 +40,7 @@
     msg_dead_block:  .asciiz "Your pet is dead! You must Reset (R) or Quit (Q).\n"
     
     # Command prompt
-    msg_prompt:     .asciiz "Enter a command (F, E, P, I, R, Q) > "
+    msg_prompt:     .asciiz "Enter a command: \n F to Feed \n E to Entertain \n P to Pet \n I to Ignore \n R to Reset \n Q to Quit \n> "
     
     # Command recognized messages
     msg_cmd_feed:   .asciiz "Command recognized: Feed "
@@ -198,7 +198,6 @@ main_loop:
     mul  $t8, $t7, $t6    # t8 = total_damage = num_ticks * EDR
     sub  $t5, $t5, $t8    # current_energy -= total_damage
     sw   $t5, current_energy
-    
     # Update last_tick by adding (num_ticks * 1000)
     # This keeps the remainder milliseconds for the next loop (accuracy)
     mul  $t9, $t7, $t4    # t9 = time_accounted (ms)
