@@ -20,6 +20,9 @@
     last_tick:      .word   0
     input_buffer:   .space  12          # A buffer for the input string
     pet_sleeping:   .word   0   # 0 = awake, 1 = sleeping
+    level: 	    .word 1
+    positive_actions:.word 0   # count of positive commands
+
 
     # Startup messages
     msg_title:      .asciiz "=== Digital Pet Simulator (MIPS32) ===\n"
@@ -46,7 +49,7 @@
     msg_cured:      .asciiz "You gave your Digital Pet medicine. It is cured!\n"
     
     # Command prompt
-    msg_prompt:     .asciiz "Enter a command (F, E, P, I, S, R, Q) > "
+    msg_prompt:     .asciiz "Enter a command (F, E, P, I, D, S, R, Q) > "
     
     # Command recognized messages
     msg_cmd_feed:   .asciiz "Command recognized: Feed "
@@ -61,6 +64,14 @@
     msg_cmd_rec:    .asciiz "Command recognized: "
     msg_sleep:      .asciiz "Your pet is sleeping\n"
     msg_wake:       .asciiz "Your pet woke up\n"
+    msg_cmd_dating: .asciiz "Command recognized: Dating\n"
+    msg_dating_locked:.asciiz "Your pet is too young to date! Dating is locked. Reach level 2 first.\n"
+    msg_sleep_block: .asciiz "Your pet is sleeping. Wake it up first.\n"
+    msg_happy: .asciiz "Your pet is happyly in love!\n"
+    msg_calm:  .asciiz "Your pet feels calm today.\n"
+    msg_sad:   .asciiz "Your pet feels a bit sad.\n"
+    msg_level:      .asciiz "Level: "
+    msg_level_up:   .asciiz "Level up! Current level: "
 
     # Reset and Ignore messages
     msg_reset_done:     .asciiz "Digital Pet has been reset to its initial state!\n"
@@ -457,6 +468,9 @@ check_cmd_type:
 
     li $t2, 'S'
     beq $s0, $t2, do_sleep
+    
+    li $t2, 'D'
+    beq $s0, $t2, do_dating
 
     li $t2, 'C'
     bne $s0, $t2, check_cmd_type_invalid
@@ -484,6 +498,8 @@ do_feed:
     move $a0, $s1
     li $a1, 1
     jal update_energy
+    
+    jal increase_positive
 
     j parse_done
 
@@ -495,6 +511,8 @@ do_entertain:
     move $a0, $s1
     li $a1, 2
     jal update_energy
+    
+    jal increase_positive
 
     j parse_done
 
@@ -506,6 +524,8 @@ do_pet:
     move $a0, $s1
     li $a1, 2
     jal update_energy
+    
+    jal increase_positive
 
     j parse_done
 
@@ -647,7 +667,115 @@ reset:
     la $a0, msg_reset_done
     syscall
     
+    li  $t0, 0
+    sw  $t0, pet_sleeping
+    sw  $t0, pet_sick
+    sw  $t0, positive_actions
+
+    li  $t1, 1
+    sw  $t1, level
+    
     jr $ra
+
+# ========================================
+# level up
+# ========================================
+
+increase_positive:
+    lw  $t0, positive_actions
+    addi $t0, $t0, 1
+    sw  $t0, positive_actions
+
+    li  $t1, 5
+    blt $t0, $t1, inc_done
+
+    # level up
+    li  $t0, 0
+    sw  $t0, positive_actions
+
+    lw  $t2, level
+    addi $t2, $t2, 1
+    sw  $t2, level
+
+    li  $v0, 4
+    la  $a0, msg_level_up
+    syscall
+    
+    
+    lw  $a0, level
+    li  $v0, 1
+    syscall
+    
+    la  $a0, newline
+    li  $v0, 4
+    syscall
+
+inc_done:
+    jr $ra
+
+# ========================================
+# datiing
+# ========================================
+
+do_dating:
+    # block if sleeping
+    lw  $t2, pet_sleeping
+    bne $t2, $zero, dating_sleep_block
+
+    # block if level < 2
+    lw  $t0, level
+    li  $t1, 2
+    blt $t0, $t1, dating_level_block
+
+    # command recognized
+    la  $a0, msg_cmd_dating
+    li  $v0, 4
+    syscall
+
+    # random mood: 0 / 1 / 2
+    li  $v0, 42
+    li  $a0, 0
+    li  $a1, 2
+    syscall
+    move $t3, $a0
+
+    beq $t3, $zero, dating_happy
+    li  $t4, 1
+    beq $t3, $t4, dating_calm
+
+dating_sad:
+    li  $v0, 4
+    la  $a0, msg_sad
+    syscall
+    j parse_done
+
+dating_calm:
+    li  $v0, 4
+    la  $a0, msg_calm
+    syscall
+    j parse_done
+
+dating_happy:
+    li  $v0, 4
+    la  $a0, msg_happy
+    syscall
+
+    # happy, positive interaction, can help up the level
+    jal increase_positive
+    j parse_done
+
+dating_sleep_block:
+    li  $v0, 4
+    la  $a0, msg_sleep_block
+    syscall
+    j parse_done
+
+dating_level_block:
+    li  $v0, 4
+    la  $a0, msg_dating_locked
+    syscall
+    
+    j parse_done
 
 # ========================================
 # quit
@@ -726,6 +854,10 @@ print_status_bar:
 
     bge $t0, $zero, calc_bar_ratio # Turns negative input into 0
     li $t0, 0
+        
+    li  $v0, 4
+    la  $a0, newline
+    syscall
 
 calc_bar_ratio: 
     # implementing the formula: (current energy * width of the bar) / MEL
@@ -781,6 +913,18 @@ print_bar_end:
 
     li $v0, 4
     la $a0, newline
+    syscall
+    
+    li  $v0, 4
+    la  $a0, msg_level
+    syscall
+    
+    lw  $a0, level
+    li  $v0, 1
+    syscall
+    
+    li  $v0, 4
+    la  $a0, newline
     syscall
 
     lw $ra, 0($sp)
