@@ -69,7 +69,7 @@
     # Strings for displaying the energy bar
 
     energy_bar_start: .asciiz "["
-    energy_bar_fill: .asciiz "="
+    energy_bar_fill: .asciiz "#"
     energy_bar_empty: .asciiz "-"
     energy_bar_end: .asciiz "] Energy: "
 
