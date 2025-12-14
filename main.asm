@@ -52,6 +52,10 @@
     msg_reset_done:     .asciiz "Digital Pet has been reset to its initial state!\n"
     msg_ignore_loss:    .asciiz "Energy decreased by "
     msg_ignore_result:  .asciiz "Current energy: "
+    
+    # Time depletion messages
+    msg_time_tick:      .asciiz "Time +1s... Natural energy depletion!\n"
+    msg_curr_energy:    .asciiz "Current energy: "
  
     # Quit messages
     msg_saving:     .asciiz "Saving session... goodbye!\n" # do we need to save&load session?
@@ -151,7 +155,7 @@ main:
     # Initialise last_tick with current time (ms)
     li  $v0, 30
     syscall
-    sw  $v0, last_tick
+    sw  $a0, last_tick
     
     
 # Main game loop
@@ -167,24 +171,60 @@ main_loop:
     lw   $t0, pet_alive
     beq  $t0, $zero, after_depletion
 
-    # (B) check if 1 second passed since last_tick
+    # (B) check how many seconds passed since last_tick
     li   $v0, 30          # get current time (ms)
     syscall
-    move $t1, $v0         # t1 = current_time
+    move $t1, $a0         # t1 = current_time (low 32 bits)
 
     lw   $t2, last_tick   # t2 = last_tick
     sub  $t3, $t1, $t2    # t3 = elapsed time
 
     li   $t4, 1000
-    blt  $t3, $t4, after_depletion
+    div  $t3, $t4         # elapsed / 1000
+    mflo $t7              # t7 = num_ticks (seconds passed)
+
+    blez $t7, after_depletion # if less than 1 second passed, skip
 
 
-    # (C) if yes, subtract EDR and update last_tick
+    # (C) subtract EDR * num_ticks and update last_tick
     lw   $t5, current_energy
     lw   $t6, EDR
-    sub  $t5, $t5, $t6
+    
+    mul  $t8, $t7, $t6    # t8 = total_damage = num_ticks * EDR
+    sub  $t5, $t5, $t8    # current_energy -= total_damage
     sw   $t5, current_energy
-    sw   $t1, last_tick   # last_tick = current_time
+    
+    # Update last_tick by adding (num_ticks * 1000)
+    # This keeps the remainder milliseconds for the next loop (accuracy)
+    mul  $t9, $t7, $t4    # t9 = time_accounted (ms)
+    add  $t2, $t2, $t9    # last_tick += time_accounted
+    sw   $t2, last_tick
+
+        # [NEW] Print natural depletion message loop
+    move $t9, $t7        # t9 = num_ticks counter
+
+print_tick_loop:
+    blez $t9, print_tick_done
+
+    li   $v0, 4
+    la   $a0, msg_time_tick
+    syscall
+
+    sub  $t9, $t9, 1
+    j    print_tick_loop
+
+print_tick_done:
+    li   $v0, 4
+    la   $a0, msg_curr_energy
+    syscall
+    
+    lw   $a0, current_energy
+    li   $v0, 1
+    syscall
+    
+    li   $v0, 4
+    la   $a0, newline
+    syscall
 
 
     # (D) if energy <= 0, clamp to 0, set pet_alive=0, print death messages
@@ -545,7 +585,7 @@ reset:
 
     li  $v0, 30
     syscall
-    sw  $v0, last_tick
+    sw  $a0, last_tick
 
     li $v0, 4
     la $a0, msg_reset_done
