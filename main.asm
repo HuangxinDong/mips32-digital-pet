@@ -351,8 +351,9 @@ handle_death:
 # ========================================
 
 read_config:
-    addi $sp, $sp, -4
-    sw $ra, 0($sp)
+    addi $sp, $sp, -8
+    sw $ra, 4($sp)
+    sw $s1, 0($sp)
 
     move $s1, $a1
 
@@ -390,8 +391,9 @@ use_default:
     sw $t9, ($s1)
 
 read_config_done:
-    lw $ra, 0($sp)
-    addi $sp, $sp, 4
+    lw $s1, 0($sp)
+    lw $ra, 4($sp)
+    addi $sp, $sp, 8
     jr $ra
 
 # COMMAND PARSING
