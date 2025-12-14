@@ -40,7 +40,7 @@
     msg_dead_block:  .asciiz "Your pet is dead! You must Reset (R) or Quit (Q).\n"
     
     # Command prompt
-    msg_prompt:     .asciiz "Enter a command: \n F to Feed \n E to Entertain \n P to Pet \n I to Ignore \n R to Reset \n Q to Quit \n> "
+    msg_prompt:     .asciiz "Enter a command (F, E, P, I, R, Q) > "
     
     # Command recognized messages
     msg_cmd_feed:   .asciiz "Command recognized: Feed "
