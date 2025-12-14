@@ -1,7 +1,11 @@
 # ========================================
 # MIPS Digital Pet Group C
 #
-# 
+# Core Functionality:
+# > Feed, Entertain, Pet, Ignore
+#
+# Extra Functionality:
+# >
 # ========================================
 
 .data
@@ -13,7 +17,7 @@
     
     # Startup messages
     msg_title:      .asciiz "=== Digital Pet Simulator (MIPS32) ===\n"
-    msg_init:       .asciiz "Initializing system...\n"
+    msg_init:       .asciiz "Initializing system...\n\n"
     msg_params:     .asciiz "Please set parameters (press Enter for default):\n"
     msg_edr_prompt: .asciiz "Enter Natural Energy Depletion Rate (EDR) [Default: 1]: "
     msg_mel_prompt: .asciiz "Enter Maximum Energy Level (MEL) [Default: 15]: "
@@ -26,10 +30,11 @@
     msg_iel_info:   .asciiz "- IEL: "
     msg_units:      .asciiz " units\n"
     msg_units_sec:  .asciiz " units/sec\n"
-
+    
+    msg_max_energy: .asciiz "Error, maximum energy level reached! Capped to the Max.\n"
     msg_alive:      .asciiz "Your Digital Pet is alive! Current status:\n"
-    msg_died1:       .asciiz "Error, energy level equal or less than 0. DP is dead!\n"
-    msg_died2:       .asciiz " *** Your Digital Pet has died! ***\n"
+    msg_died1:      .asciiz "Error, energy level equal or less than 0. DP is dead!\n"
+    msg_died2:      .asciiz " *** Your Digital Pet has died! ***\n"
     
     # Command prompt
     msg_prompt:     .asciiz "Enter a command (F, E, P, I, R, Q) > "
@@ -285,23 +290,47 @@ check_cmd_type:
     j parse_done
 
 do_feed:
+    move $a1, $s1
+    la $a0, msg_cmd_feed
+    jal print_cmd_success
+
     move $a0, $s1
-    jal feed
+    li $a1, 1
+    jal update_energy
+
     j parse_done
 
 do_entertain:
+    move $a1, $s1
+    la $a0, msg_cmd_enter
+    jal print_cmd_success
+
     move $a0, $s1
-    jal entertain
+    li $a1, 2
+    jal update_energy
+
     j parse_done
 
 do_pet:
+    move $a1, $s1
+    la $a0, msg_cmd_pet
+    jal print_cmd_success
+
     move $a0, $s1
-    jal pet
+    li $a1, 2
+    jal update_energy
+
     j parse_done
 
 do_ignore:
+    move $a1, $s1
+    la $a0, msg_cmd_ignore
+    jal print_cmd_success
+
     move $a0, $s1
-    jal ignore
+    li $a1, -3
+    jal update_energy
+
     j parse_done
 
 do_reset:
@@ -322,125 +351,6 @@ parse_done:
     jr $ra
 
 # EXECUTE COMMANDS
-
-# ========================================
-# feed
-# ========================================
-
-# just to test successfully parsed
-# feel free to delete/change this lol
-feed:
-    addi $sp, $sp, -8
-    sw $ra, 4($sp)
-    sw $s0, 0($sp)
-    move $s0, $a0 # Save n to $s0
-
-    move $a1, $s0
-    la $a0, msg_cmd_feed
-    jal print_cmd_success
-
-    # TODO: Feed
-
-    lw $s0, 0($sp)
-    lw $ra, 4($sp)
-    addi $sp, $sp, 8
-    jr $ra
-
-# ========================================
-# entertain
-# ========================================
-
-entertain:
-    addi $sp, $sp, -8
-    sw $ra, 4($sp)
-    sw $s0, 0($sp)
-
-    move $s0, $a0 # Save n to $s0
-
-    move $a1, $s0
-    la $a0, msg_cmd_enter
-    jal print_cmd_success
-
-    # TODO: Entertain
-
-    lw $s0, 0($sp)
-    lw $ra, 4($sp)
-    addi $sp, $sp, 8
-    jr $ra
-
-# ========================================
-# pet
-# ========================================
-
-pet:
-    addi $sp, $sp, -8
-    sw $ra, 4($sp)
-    sw $s0, 0($sp)
-
-    move $s0, $a0 # Save n to $s0
-
-    move $a1, $s0
-    la $a0, msg_cmd_pet
-    jal print_cmd_success
-
-    # TODO: Pet
-
-    lw $s0, 0($sp)
-    lw $ra, 4($sp)
-    addi $sp, $sp, 8
-    jr $ra
-
-# ========================================
-# ignore
-# ========================================
-
-ignore:
-    addi $sp, $sp, -8
-    sw $ra, 4($sp)
-    sw $s0, 0($sp)
-
-    move $s0, $a0 # Save n to $s0
-
-    # Print command recognized
-    move $a1, $s0
-    la $a0, msg_cmd_ignore
-    jal print_cmd_success
-
-    li $t1, 3
-    mul $t2, $s0, $t1 # t2(damage) = n * 3
-    
-    lw $t3, current_energy
-    sub $t3, $t3, $t2 # t3 = new energy
-    sw $t3, current_energy
-
-    li $v0, 4
-    la $a0, msg_ignore_loss # Print "Energy decreased by "
-    syscall
-
-    move $a0, $t2
-    li $v0, 1 # damage amount
-    syscall
-
-    li $v0, 4
-    la $a0, newline
-    syscall
-
-    li $v0, 4
-    la $a0, msg_ignore_result
-    syscall
-
-    lw $a0, current_energy
-    li $v0, 1
-    syscall
-
-    li $v0, 4
-    la $a0, newline
-    syscall
-
-    lw $s0, 0($sp)
-    lw $ra, 4($sp)
-    addi $sp, $sp, 8
-    jr $ra
 
 # ========================================
 # reset
@@ -478,6 +388,48 @@ quit:
     li $v0, 10 # exit program
     syscall
 
+# DATA LAYER
+
+# ========================================
+# update_energy
+#   Increments energy by $a0 (n) * $a1
+#   Handles if energy <= 0
+# ========================================
+
+update_energy:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+
+    mul $t0, $a0, $a1
+
+    lw $t1, current_energy
+    add $t1, $t1, $t0
+
+    lw $t2, MEL
+    ble $t1, $t2, update_energy_check_min
+    move $t1, $t2
+
+    # Print "Max Energy" message
+    li $v0, 4
+    la $a0, msg_max_energy
+    syscall
+
+    j update_energy_store_energy
+
+update_energy_check_min:
+    bge $t1, $zero, update_energy_store_energy
+    li $t1, 0
+
+    li $v0, 4
+    la $a0, msg_died1
+    syscall
+
+update_energy_store_energy:
+    sw $t1, current_energy
+
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr $ra
 
 # TIMING FUNCTIONS
 
