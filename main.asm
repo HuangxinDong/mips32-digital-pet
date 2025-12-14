@@ -72,6 +72,16 @@
     msg_saving:     .asciiz "Saving session... goodbye!\n" # do we need to save&load session?
     msg_terminated: .asciiz "--- simulation terminated ---\n"
 
+    # Strings for displaying the energy bar
+
+    energy_bar_start: .asciiz "["
+    energy_bar_fill: .asciiz "#"
+    energy_bar_empty: .asciiz "-"
+    energy_bar_end: .asciiz "] Energy: "
+
+    # String for slash
+    str_slash: .asciiz "/"
+
 .text
 .globl main
 
@@ -221,6 +231,10 @@ main_loop_skip_sickness:
     
     mul  $t8, $t7, $t6    # t8 = total_damage = num_ticks * EDR
     sub  $t5, $t5, $t8    # current_energy -= total_damage
+    bge $t5, $0, skip_clamp_natural
+    li $t5, 0
+
+skip_clamp_natural:
     sw   $t5, current_energy
     
     # Update last_tick by adding (num_ticks * 1000)
@@ -253,17 +267,7 @@ print_tick_loop:
     j    print_tick_loop
 
 print_tick_done:
-    li   $v0, 4
-    la   $a0, msg_curr_energy
-    syscall
-    
-    lw   $a0, current_energy
-    li   $v0, 1
-    syscall
-    
-    li   $v0, 4
-    la   $a0, newline
-    syscall
+    jal print_status_bar
 
     # (D) if energy <= 0, clamp to 0, set pet_alive=0, print death messages
     blez $t5, handle_death
@@ -304,6 +308,8 @@ after_depletion:
 allow_command:
 
     jal parse_command
+    
+    jal print_status_bar
 
     j main_loop # --- END OF WHILE LOOP ---
 
@@ -625,6 +631,7 @@ update_energy:
 
     mul $t0, $a0, $a1
 
+
     lw $t1, current_energy
     add $t1, $t1, $t0
 
@@ -659,6 +666,81 @@ update_energy_store_energy:
 
 
 # DISPLAY FUNCTIONS
+# ========================================
+# print_status_bar
+#   Output: [======----] Energy: 6/15
+#   Converts the energy fraction into a display bar
+# ========================================
+
+print_status_bar:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+    lw $t0, current_energy
+    lw $t1, MEL
+    li $t2, 20 # Keeping the bar width to be 20 characters
+
+    bge $t0, $zero, calc_bar_ratio # Turns negative input into 0
+    li $t0, 0
+
+calc_bar_ratio: 
+    # implementing the formula: (current energy * width of the bar) / MEL
+    mul $t3, $t0, $t2
+    div $t3, $t1
+    mflo $t3
+
+    ble $t3, $t2, draw_bar_start
+    li $t3, 20
+
+draw_bar_start:
+    li $v0, 4
+    la $a0, energy_bar_start
+    syscall
+
+    move $t4, $t3
+
+print_fill_loop:
+    blez $t4, print_empty_start
+    li   $v0, 4
+    la   $a0, energy_bar_fill
+    syscall
+    sub  $t4, $t4, 1
+    j    print_fill_loop
+
+print_empty_start:
+    sub $t4, $t2, $t3 # empty bars = bar width - no of filled bars
+    
+print_empty_loop:
+    blez $t4, print_bar_end
+    li $v0, 4
+    la $a0, energy_bar_empty
+    syscall
+    sub $t4, $t4, 1
+    j print_empty_loop
+
+print_bar_end:
+    li $v0, 4
+    la $a0, energy_bar_end
+    syscall
+
+    lw $a0, current_energy
+    li $v0, 1
+    syscall
+
+    li $v0, 4
+    la $a0, str_slash
+    syscall
+    
+    lw $a0, MEL
+    li $v0, 1
+    syscall
+
+    li $v0, 4
+    la $a0, newline
+    syscall
+
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr $ra
 
 
 
