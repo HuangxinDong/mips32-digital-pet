@@ -1,0 +1,4 @@
+(a) whether you used Gen AI
+(b) extra feature you have implemented
+
+just put here so we don't forget
