@@ -31,6 +31,7 @@
     msg_mel_info:   .asciiz "- MEL: "
     msg_iel_info:   .asciiz "- IEL: "
     msg_units:      .asciiz " units\n"
+    msg_units2:     .asciiz " units"
     msg_units_sec:  .asciiz " units/sec\n"
     
     msg_max_energy: .asciiz "Error, maximum energy level reached! Capped to the Max.\n"
@@ -525,8 +526,6 @@ quit:
     li $v0, 10 # exit program
     syscall
 
-# DATA LAYER
-
 # ========================================
 # update_energy
 #   Increments energy by $a0 (n) * $a1
@@ -542,110 +541,104 @@ update_energy:
     move $s0, $a0
     move $s1, $a1
 
+    # print_update_energy
+    move $a0, $s0
+    move $a1, $s1
+    jal print_update_energy
+
+    # Calculate delta + update energy
     mul  $t0, $s0, $s1
 
-    bltz $t0, print_decrease
+    lw $t1, current_energy
+    add $t1, $t1, $t0
 
-print_increase:
-    li   $v0, 4
-    la   $a0, msg_inc_by
-    syscall
+    lw $t2, MEL
+    ble $t1, $t2, update_energy__check_min
 
-    move $a0, $t0
-    li   $v0, 1
-    syscall
-
-    li   $v0, 4
-    la   $a0, msg_units
-    syscall
-
-    li   $t9, 1
-    beq  $s1, $t9, do_update_math
-    j    print_details
-
-print_decrease:
-    li   $v0, 4
-    la   $a0, msg_ignore_loss
-    syscall
-    
-    abs  $a0, $t0
-    li   $v0, 1
-    syscall
-
-print_details:
-    li   $v0, 4
-    la   $a0, msg_lparen
-    syscall
-    
-    li   $v0, 1
-    abs  $a0, $s1
-    syscall
-    
-    li   $v0, 4
-    la   $a0, msg_x
-    syscall
-    
-    li   $v0, 1
-    move $a0, $s0
-    syscall
-    
-    li   $v0, 4
-    la   $a0, msg_rparen
-    syscall
-do_update_math:
-    lw   $t1, current_energy
-    add  $t1, $t1, $t0
-    lw   $t2, MEL
-    ble  $t1, $t2, check_min_cap
-    
     move $t1, $t2
-    li   $v0, 4
-    la   $a0, msg_max_energy
+    li $v0, 4
+    la $a0, msg_max_energy
     syscall
-    j    save_energy
+    j update_energy__save
 
-check_min_cap:
-    bgt  $t1, $zero, save_energy
-    li   $t1, 0
-    li   $v0, 4
-    la   $a0, msg_died1
+update_energy__check_min:
+    bge $t1, $zero, update_energy__save
+    li $t1, 0
+    li $v0, 4
+    la $a0, msg_died1
     syscall
 
-save_energy:
-    sw   $t1, current_energy 
-    lw   $s1, 0($sp)
-    lw   $s0, 4($sp)
-    lw   $ra, 8($sp)
+update_energy__save:
+    sw $t1, current_energy
+
+    # Restore and return
+    lw $s1, 0($sp)
+    lw $s0, 4($sp)
+    lw $ra, 8($sp)
     addi $sp, $sp, 12
-    jr   $ra
+    jr $ra
 
-# TIMING FUNCTIONS
+# ========================================
+# print_update_energy
+#   prints update energy text
+# ========================================
 
+print_update_energy:
+    move $t0, $a0
+    move $t1, $a1
+    mul $t2, $t0, $t1
+    
+    # determine increase or decrease
+    bltz $t2, print_update_energy__print_decrease
 
-
-# DISPLAY FUNCTIONS
-
-
-
-# UTILITY FUNCTIONS
-
-print_string:
-    # Print null-terminated string in $a0
-    li      $v0, 4
+    li $v0, 4
+    la $a0, msg_inc_by
     syscall
-    jr      $ra
+    j print_update_energy__val
 
-print_int:
-    # Print integer in $a0
-    li      $v0, 1
+print_update_energy__print_decrease:
+    li $v0, 4
+    la $a0, msg_ignore_loss
     syscall
-    jr      $ra
 
-print_char:
-    # Print character in $a0
-    li      $v0, 11
+print_update_energy__val:
+    li $v0, 1
+    abs $a0, $t2
     syscall
-    jr      $ra
+
+    li $v0, 4
+    la $a0, msg_units2
+    syscall
+
+    li $t3, 1
+    beq $t1, $t3, print_update_energy__done
+
+    li $v0, 4
+    la $a0, msg_lparen
+    syscall
+
+    li $v0, 1
+    abs $a0, $t1
+    syscall
+
+    li $v0, 4
+    la $a0, msg_x
+    syscall
+
+    li $v0, 1
+    move $a0, $t0
+    syscall
+
+    li $v0, 4
+    la $a0, msg_rparen
+    syscall
+
+print_update_energy__done:
+    li $v0, 4
+    la $a0, newline
+    syscall
+
+    jr $ra
 
 # ========================================
 # print_cmd_success
