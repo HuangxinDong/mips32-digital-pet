@@ -423,18 +423,6 @@ do_feed:
     move $a0, $s1
     li $a1, 1
 
-    li $v0, 4
-    la $a0, msg_inc_by
-    syscall
-
-    move $a0, $s1
-    li $v0, 1
-    syscall
-    
-    li $v0, 4
-    la $a0, msg_units
-    syscall
-
     jal update_energy
 
     j parse_done
@@ -446,35 +434,6 @@ do_entertain:
 
     move $a0, $s1
     li $a1, 2
-
-    mul $t0, $s1, 2 
-
-    li $v0, 4
-    la $a0, msg_inc_by
-    syscall
-
-    move $a0, $t0 
-    li $v0, 1
-    syscall
-
-    li $v0, 4
-    la $a0, msg_units
-    syscall
-    li $v0, 4
-    la $a0, msg_lparen
-    syscall
-    li $v0, 1
-    li $a0, 2
-    syscall
-    li $v0, 4
-    la $a0, msg_x
-    syscall
-    li $v0, 1
-    move $a0, $s1
-    syscall
-    li $v0, 4
-    la $a0, msg_rparen
-    syscall
 
     jal update_energy
 
@@ -488,35 +447,6 @@ do_pet:
     move $a0, $s1
     li $a1, 2
 
-    mul $t0, $s1, 2 
-
-    li $v0, 4
-    la $a0, msg_inc_by
-    syscall
-
-    move $a0, $t0
-    li $v0, 1
-    syscall
-
-    li $v0, 4
-    la $a0, msg_units
-    syscall
-    li $v0, 4
-    la $a0, msg_lparen
-    syscall
-    li $v0, 1
-    li $a0, 2
-    syscall
-    li $v0, 4
-    la $a0, msg_x
-    syscall
-    li $v0, 1
-    move $a0, $s1
-    syscall
-    li $v0, 4
-    la $a0, msg_rparen
-    syscall
-
     jal update_energy
 
     j parse_done
@@ -528,34 +458,6 @@ do_ignore:
 
     move $a0, $s1
     li $a1, -3
-
-    mul $t0, $s1, 3
-
-    li $v0, 4
-    la $a0, msg_ignore_loss 
-    syscall
-
-    move $a0, $t0 
-    li $v0, 1
-    syscall
-
-    li $v0, 4
-    la $a0, msg_lparen
-    syscall
-
-    li $v0, 1
-    li $a0, 3
-    syscall
-
-    li $v0, 4
-    la $a0, msg_x
-    syscall
-    li $v0, 1
-    move $a0, $s1 
-    syscall
-    li $v0, 4
-    la $a0, msg_rparen
-    syscall
 
     jal update_energy
 
@@ -632,39 +534,90 @@ quit:
 # ========================================
 
 update_energy:
-    addi $sp, $sp, -4
-    sw $ra, 0($sp)
+    addi $sp, $sp, -12
+    sw $ra, 8($sp)
+    sw $s0, 4($sp) # to save n
+    sw $s1, 0($sp) # will save scale
 
-    mul $t0, $a0, $a1
+    move $s0, $a0
+    move $s1, $a1
 
-    lw $t1, current_energy
-    add $t1, $t1, $t0
+    mul  $t0, $s0, $s1
 
-    lw $t2, MEL
-    ble $t1, $t2, update_energy_check_min
+    bltz $t0, print_decrease
+
+print_increase:
+    li   $v0, 4
+    la   $a0, msg_inc_by
+    syscall
+
+    move $a0, $t0
+    li   $v0, 1
+    syscall
+
+    li   $v0, 4
+    la   $a0, msg_units
+    syscall
+
+    li   $t9, 1
+    beq  $s1, $t9, do_update_math
+    j    print_details
+
+print_decrease:
+    li   $v0, 4
+    la   $a0, msg_ignore_loss
+    syscall
+    
+    abs  $a0, $t0
+    li   $v0, 1
+    syscall
+
+print_details:
+    li   $v0, 4
+    la   $a0, msg_lparen
+    syscall
+    
+    li   $v0, 1
+    abs  $a0, $s1
+    syscall
+    
+    li   $v0, 4
+    la   $a0, msg_x
+    syscall
+    
+    li   $v0, 1
+    move $a0, $s0
+    syscall
+    
+    li   $v0, 4
+    la   $a0, msg_rparen
+    syscall
+do_update_math:
+    lw   $t1, current_energy
+    add  $t1, $t1, $t0
+    lw   $t2, MEL
+    ble  $t1, $t2, check_min_cap
+    
     move $t1, $t2
+    li   $v0, 4
+    la   $a0, msg_max_energy
+    syscall
+    j    save_energy
 
-    # Print "Max Energy" message
-    li $v0, 4
-    la $a0, msg_max_energy
+check_min_cap:
+    bgt  $t1, $zero, save_energy
+    li   $t1, 0
+    li   $v0, 4
+    la   $a0, msg_died1
     syscall
 
-    j update_energy_store_energy
-
-update_energy_check_min:
-    bge $t1, $zero, update_energy_store_energy
-    li $t1, 0
-
-    li $v0, 4
-    la $a0, msg_died1
-    syscall
-
-update_energy_store_energy:
-    sw $t1, current_energy
-
-    lw $ra, 0($sp)
-    addi $sp, $sp, 4
-    jr $ra
+save_energy:
+    sw   $t1, current_energy 
+    lw   $s1, 0($sp)
+    lw   $s0, 4($sp)
+    lw   $ra, 8($sp)
+    addi $sp, $sp, 12
+    jr   $ra
 
 # TIMING FUNCTIONS
 
