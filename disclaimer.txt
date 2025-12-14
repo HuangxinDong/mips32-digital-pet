@@ -1,4 +1,7 @@
-(a) whether you used Gen AI
-(b) extra feature you have implemented
+Group C
 
-just put here so we don't forget
+1. AI Disclaimer
+Large Language Models were used as a supplementary learning resource to assist in this project.
+
+2. Additional Features
+Sickness: The Pet is able to randomly get sick, which causes it to lose energy at twice the normal rate. It can be cured with 'C', but this command is not available when the Pet is not sick.
