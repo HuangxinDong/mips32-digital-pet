@@ -1,12 +1,6 @@
 # ========================================|========================================|========================================
-# MIPS Digital Pet Group C
 #
-# Core Functionality:
-# > Feed, Entertain, Pet, Ignore
-#
-# 
-# Extra Functionality:
-# > Sickness: The pet has a random chance every second to get sick, and can be cured with 'C'
+#                                                   MIPS Digital Pet Group C
 #
 # ========================================|========================================|========================================
 
@@ -46,6 +40,7 @@
     msg_mel_info:   .asciiz "- MEL: "
     msg_iel_info:   .asciiz "- IEL: "
     msg_units:      .asciiz " units\n"
+    msg_units2:     .asciiz " units"
     msg_units_sec:  .asciiz " units/sec\n"
     
     msg_max_energy: .asciiz "Error, maximum energy level reached! Capped to the Max.\n"
@@ -108,6 +103,12 @@
 
     # String for slash
     str_slash: .asciiz "/"
+
+     # Messages to display math formatting
+    msg_inc_by: .asciiz "Energy increased by: "
+    msg_lparen: .asciiz " ("
+    msg_x: .asciiz "x"
+    msg_rparen: .asciiz ")\n"
 
 .text
 .globl main
@@ -317,7 +318,6 @@ main_loop_skip_sickness:
 
 skip_clamp_natural:
     sw   $t5, current_energy
-    
     # Update last_tick by adding (num_ticks * 1000)
     # This keeps the remainder milliseconds for the next loop (accuracy)
     mul  $t9, $t7, $t4    # t9 = time_accounted (ms)
@@ -559,6 +559,7 @@ do_feed:
 
     move $a0, $s1
     li $a1, 1
+
     jal update_energy
     
     jal increase_positive
@@ -572,6 +573,7 @@ do_entertain:
 
     move $a0, $s1
     li $a1, 2
+
     jal update_energy
     
     jal increase_positive
@@ -585,6 +587,7 @@ do_pet:
 
     move $a0, $s1
     li $a1, 2
+
     jal update_energy
     
     jal increase_positive
@@ -598,6 +601,7 @@ do_ignore:
 
     move $a0, $s1
     li $a1, -3
+
     jal update_energy
 
     j parse_done
@@ -985,45 +989,114 @@ load_done:
 # ========================================
 
 update_energy:
-    addi $sp, $sp, -4
-    sw $ra, 0($sp)
+    addi $sp, $sp, -12
+    sw $ra, 8($sp)
+    sw $s0, 4($sp) # to save n
+    sw $s1, 0($sp) # will save scale
 
-    mul $t0, $a0, $a1
+    move $s0, $a0
+    move $s1, $a1
+
+    # print_update_energy
+    move $a0, $s0
+    move $a1, $s1
+    jal print_update_energy
+
+    # Calculate delta + update energy
+    mul  $t0, $s0, $s1
 
 
     lw $t1, current_energy
     add $t1, $t1, $t0
 
     lw $t2, MEL
-    ble $t1, $t2, update_energy_check_min
-    move $t1, $t2
+    ble $t1, $t2, update_energy__check_min
 
-    # Print "Max Energy" message
+    move $t1, $t2
     li $v0, 4
     la $a0, msg_max_energy
     syscall
+    j update_energy__save
 
-    j update_energy_store_energy
-
-update_energy_check_min:
-    bge $t1, $zero, update_energy_store_energy
+update_energy__check_min:
+    bge $t1, $zero, update_energy__save
     li $t1, 0
-
     li $v0, 4
     la $a0, msg_died1
     syscall
 
-update_energy_store_energy:
+update_energy__save:
     sw $t1, current_energy
 
-    lw $ra, 0($sp)
-    addi $sp, $sp, 4
+    # Restore and return
+    lw $s1, 0($sp)
+    lw $s0, 4($sp)
+    lw $ra, 8($sp)
+    addi $sp, $sp, 12
     jr $ra
 
-# TIMING FUNCTIONS
+# ========================================
+# print_update_energy
+#   prints update energy text
+# ========================================
 
+print_update_energy:
+    move $t0, $a0
+    move $t1, $a1
+    mul $t2, $t0, $t1
+    
+    # determine increase or decrease
+    bltz $t2, print_update_energy__print_decrease
 
+    li $v0, 4
+    la $a0, msg_inc_by
+    syscall
+    j print_update_energy__val
 
+print_update_energy__print_decrease:
+    li $v0, 4
+    la $a0, msg_ignore_loss
+    syscall
+
+print_update_energy__val:
+    li $v0, 1
+    abs $a0, $t2
+    syscall
+
+    li $v0, 4
+    la $a0, msg_units2
+    syscall
+
+    li $t3, 1
+    beq $t1, $t3, print_update_energy__done
+
+    li $v0, 4
+    la $a0, msg_lparen
+    syscall
+
+    li $v0, 1
+    abs $a0, $t1
+    syscall
+
+    li $v0, 4
+    la $a0, msg_x
+    syscall
+
+    li $v0, 1
+    move $a0, $t0
+    syscall
+
+    li $v0, 4
+    la $a0, msg_rparen
+    syscall
+
+print_update_energy__done:
+    li $v0, 4
+    la $a0, newline
+    syscall
+
+    jr $ra
+    
 # DISPLAY FUNCTIONS
 # ========================================
 # print_status_bar
@@ -1116,8 +1189,6 @@ print_bar_end:
     lw $ra, 0($sp)
     addi $sp, $sp, 4
     jr $ra
-
-
 
 # UTILITY FUNCTIONS
 
