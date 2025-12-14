@@ -52,7 +52,7 @@
     msg_cured:      .asciiz "You gave your Digital Pet medicine. It is cured!\n"
     
     # Command prompt
-    msg_prompt:     .asciiz "Enter a command (F, E, P, I, D, S, R, Q) > "
+    msg_prompt:     .asciiz "\nEnter a command (F, E, P, I, D, S, R, Q) > "
     
     # Command recognized messages
     msg_cmd_feed:   .asciiz "Command recognized: Feed "
@@ -104,7 +104,8 @@
     # String for slash
     str_slash: .asciiz "/"
 
-     # Messages to display math formatting
+    # Messages for energy changes
+    msg_dec_by: .asciiz "Energy decreased by: "    
     msg_inc_by: .asciiz "Energy increased by: "
     msg_lparen: .asciiz " ("
     msg_x: .asciiz "x"
@@ -1055,7 +1056,7 @@ print_update_energy:
 
 print_update_energy__print_decrease:
     li $v0, 4
-    la $a0, msg_ignore_loss
+    la $a0, msg_dec_by
     syscall
 
 print_update_energy__val:
