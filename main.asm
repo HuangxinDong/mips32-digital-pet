@@ -11,14 +11,22 @@
 # ========================================|========================================|========================================
 
 .data
+    # Global Variables & State
     EDR:            .word   1           # Energy Depletion Rate (units/sec)
     MEL:            .word   15          # Maximum Energy Level
     IEL:            .word   10          # Initial Energy Level
     current_energy: .word   10          # Current energy (initialized to IEL)
-    pet_alive:      .word   1
+    pet_alive:      .word   1           # 1 = Alive, 0 = Dead
+    last_tick:      .word   0           # Timestamp of last energy update
+    
+    # Increased buffer size to handle save codes (e.g., "1 15 10 100 1")
+    input_buffer:   .space  64          
+
+    # String Constants
+    newline:        .asciiz "\n"
+    
+    # Extra feature config
     pet_sick:       .word   0
-    last_tick:      .word   0
-    input_buffer:   .space  12          # A buffer for the input string
     pet_sleeping:   .word   0   # 0 = awake, 1 = sleeping
 
     # Startup messages
@@ -57,23 +65,28 @@
     msg_cmd_quit:   .asciiz "Command recognized: Quit "
     msg_cmd_cure:   .asciiz "Command recognized: Cure "
     msg_cmd_invalid: .asciiz "Invalid command! Please try again."
-    newline:        .asciiz "\n"
-    msg_cmd_rec:    .asciiz "Command recognized: "
     msg_sleep:      .asciiz "Your pet is sleeping\n"
     msg_wake:       .asciiz "Your pet woke up\n"
 
     # Reset and Ignore messages
     msg_reset_done:     .asciiz "Digital Pet has been reset to its initial state!\n"
-    msg_ignore_loss:    .asciiz "Energy decreased by "
-    msg_ignore_result:  .asciiz "Current energy: "
     
     # Time depletion messages
     msg_time_tick:      .asciiz "Time +1s... Natural energy depletion!\n"
     msg_curr_energy:    .asciiz "Current energy: "
  
     # Quit messages
-    msg_saving:     .asciiz "Saving session... goodbye!\n" # do we need to save&load session?
-    msg_terminated: .asciiz "--- simulation terminated ---\n"
+    # Quit messages
+    msg_saving:     .asciiz "Saving session... goodbye!\nSave Code: "
+    msg_terminated: .asciiz "\n--- simulation terminated ---\n"
+
+    # Session Management
+    msg_ask_load:     .asciiz "Do you want to restore a previous game? (Y/N) > "
+    msg_load_instr:   .asciiz "Enter your Save Code:\n"
+    msg_load_example: .asciiz "Example: 17829342\n"
+    msg_load_prompt:  .asciiz "> "
+    msg_load_success: .asciiz "Game state restored successfully!\n"
+    msg_load_invalid: .asciiz "Invalid Save Code! Starting new game.\n\n"
 
     # Strings for displaying the energy bar
 
@@ -102,6 +115,35 @@ main:
     syscall
     la $a0, msg_init
     syscall
+
+    
+    # Ask to load session
+    li $v0, 4
+    la $a0, msg_ask_load
+    syscall
+    
+    # Read input (Y/N)
+    li $v0, 8
+    la $a0, input_buffer
+    li $a1, 12
+    syscall
+    
+    lb $t0, input_buffer
+    li $t1, 'Y'
+    beq $t0, $t1, try_load
+    li $t1, 'y'
+    beq $t0, $t1, try_load
+    
+    j start_new_game
+
+try_load:
+    jal load_session
+    # If load failed ($v0=0), fall through to start_new_game
+    # If load success ($v0=1), jump to game_start_skip_config
+    bnez $v0, game_start_skip_config
+
+start_new_game:
+    li $v0, 4
     la $a0, msg_params
     syscall
 
@@ -127,15 +169,14 @@ main:
     lw $t0, IEL
     sw $t0, current_energy
 
-    li $v0, 4
-    la $a0, msg_alive
-    syscall
-
     # Print end of startup messages
     li $v0, 4
     la $a0, msg_params_set
     syscall
 
+game_start_skip_config:
+    li $v0, 4
+    la $a0, msg_alive
     # Get Random Values
     li $v0, 30      # syscall 30 for system time
     syscall
@@ -183,6 +224,19 @@ main:
     
     li $v0, 4
     la $a0, msg_units
+    syscall
+
+    # Print Current Energy
+    li $v0, 4
+    la $a0, msg_curr_energy
+    syscall
+    
+    lw $a0, current_energy
+    li $v0, 1
+    syscall
+    
+    li $v0, 4
+    la $a0, newline
     syscall
 
     # Initialise last_tick with current time (ms)
@@ -259,6 +313,7 @@ skip_clamp_natural:
     add  $t2, $t2, $t9    # last_tick += time_accounted
     sw   $t2, last_tick
 
+    # Print natural depletion message loop
     move $t9, $t7        # t9 = num_ticks counter
 
 print_tick_loop:
@@ -351,8 +406,9 @@ handle_death:
 # ========================================
 
 read_config:
-    addi $sp, $sp, -4
-    sw $ra, 0($sp)
+    addi $sp, $sp, -8
+    sw $ra, 4($sp)
+    sw $s1, 0($sp)
 
     move $s1, $a1
 
@@ -390,8 +446,9 @@ use_default:
     sw $t9, ($s1)
 
 read_config_done:
-    lw $ra, 0($sp)
-    addi $sp, $sp, 4
+    lw $s1, 0($sp)
+    lw $ra, 4($sp)
+    addi $sp, $sp, 8
     jr $ra
 
 # COMMAND PARSING
@@ -430,6 +487,11 @@ parse_arg:
 
     move $a0, $t0
     jal str_to_int
+    
+    # Check for invalid input (-1)
+    li $t2, -1
+    beq $v0, $t2, check_cmd_type_invalid
+    
     move $s1, $v0 # save integer to $s1
     j check_cmd_type
 
@@ -657,10 +719,134 @@ quit:
     li $v0, 4
     la $a0, msg_saving
     syscall
+
+    # Save session
+    jal save_session
+
+    li $v0, 4
     la $a0, msg_terminated
     syscall
     li $v0, 10 # exit program
     syscall
+
+# SESSION FUNCTIONS
+
+save_session:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+
+    # Pack variables into one 32-bit integer
+    # Structure: [EDR (8)] [MEL (8)] [IEL (8)] [ENERGY (8)], since this ensures the number is positive (MSB=0) as long as EDR < 128
+    
+    lw $t0, EDR
+    sll $t0, $t0, 8 # Shift left 8
+    
+    lw $t1, MEL
+    or $t0, $t0, $t1 # combine
+    sll $t0, $t0, 8
+    
+    lw $t1, IEL
+    or $t0, $t0, $t1
+    sll $t0, $t0, 8
+    
+    lw $t1, current_energy
+    or $t0, $t0, $t1
+    
+    # Obfuscate with XOR Key (0x12345678)
+    xori $t0, $t0, 0x12345678
+    
+    # Print save code
+    li $v0, 36 # syscall 36: print unsigned integer
+    move $a0, $t0
+    syscall
+    
+    li $v0, 11
+    li $a0, 10 # newline
+    syscall
+    
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr $ra
+
+load_session:
+    addi $sp, $sp, -8
+    sw $ra, 4($sp)
+    sw $s0, 0($sp)
+
+    li $v0, 4
+    la $a0, msg_load_instr
+    syscall
+    la $a0, msg_load_example
+    syscall
+    la $a0, msg_load_prompt
+    syscall
+
+    # Read input line
+    li $v0, 8
+    la $a0, input_buffer
+    li $a1, 64
+    syscall
+
+    # Check for empty input
+    lb $t0, input_buffer
+    li $t1, 10 # newline
+    beq $t0, $t1, load_fail
+    li $t1, 0  # null
+    beq $t0, $t1, load_fail
+
+    # Parse save code
+    la $a0, input_buffer
+    jal str_to_int
+    li $t0, -1
+    beq $v0, $t0, load_fail
+    
+    # Decrypt: XOR with Key
+    xori $t0, $v0, 0x12345678
+    
+    # Unpack EDR MEL IEL ENERGY
+
+    # Extract Energy
+    andi $t1, $t0, 0xFF
+    sw $t1, current_energy
+    srl $t0, $t0, 8
+
+    # Extract IEL
+    andi $t1, $t0, 0xFF
+    sw $t1, IEL
+    srl $t0, $t0, 8
+
+    # Extract MEL
+    andi $t1, $t0, 0xFF
+    sw $t1, MEL
+    srl $t0, $t0, 8
+    
+    # Extract EDR
+    andi $t1, $t0, 0xFF
+    sw $t1, EDR
+    
+    # Restore alive status
+    lw $t1, current_energy
+    li $t2, 0
+    sgt $t2, $t1, $zero # if energy > 0, alive=1
+    sw $t2, pet_alive
+
+    li $v0, 4
+    la $a0, msg_load_success
+    syscall
+    li $v0, 1
+    j load_done
+
+load_fail:
+    li $v0, 4
+    la $a0, msg_load_invalid
+    syscall
+    li $v0, 0
+
+load_done:
+    lw $s0, 0($sp)
+    lw $ra, 4($sp)
+    addi $sp, $sp, 8
+    jr $ra
 
 # DATA LAYER
 
@@ -791,24 +977,6 @@ print_bar_end:
 
 # UTILITY FUNCTIONS
 
-print_string:
-    # Print null-terminated string in $a0
-    li      $v0, 4
-    syscall
-    jr      $ra
-
-print_int:
-    # Print integer in $a0
-    li      $v0, 1
-    syscall
-    jr      $ra
-
-print_char:
-    # Print character in $a0
-    li      $v0, 11
-    syscall
-    jr      $ra
-
 # ========================================
 # print_cmd_success
 #   print "Command recognized: [Name] [Arg]."
@@ -859,6 +1027,9 @@ str_to_int_loop:
     beq $t0, $t3, str_to_int_done
 
     li $t3, 10
+    beq $t0, $t3, str_to_int_done
+
+    li $t3, 32  # space
     beq $t0, $t3, str_to_int_done
 
     # Check bounds
