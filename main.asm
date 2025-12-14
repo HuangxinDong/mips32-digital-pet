@@ -65,14 +65,11 @@
     msg_cmd_quit:   .asciiz "Command recognized: Quit "
     msg_cmd_cure:   .asciiz "Command recognized: Cure "
     msg_cmd_invalid: .asciiz "Invalid command! Please try again."
-    msg_cmd_rec:    .asciiz "Command recognized: "
     msg_sleep:      .asciiz "Your pet is sleeping\n"
     msg_wake:       .asciiz "Your pet woke up\n"
 
     # Reset and Ignore messages
     msg_reset_done:     .asciiz "Digital Pet has been reset to its initial state!\n"
-    msg_ignore_loss:    .asciiz "Energy decreased by "
-    msg_ignore_result:  .asciiz "Current energy: "
     
     # Time depletion messages
     msg_time_tick:      .asciiz "Time +1s... Natural energy depletion!\n"
@@ -490,6 +487,11 @@ parse_arg:
 
     move $a0, $t0
     jal str_to_int
+    
+    # Check for invalid input (-1)
+    li $t2, -1
+    beq $v0, $t2, check_cmd_type_invalid
+    
     move $s1, $v0 # save integer to $s1
     j check_cmd_type
 
@@ -754,7 +756,7 @@ save_session:
     xori $t0, $t0, 0x12345678
     
     # Print save code
-    li $v0, 1
+    li $v0, 36 # syscall 36: print unsigned integer
     move $a0, $t0
     syscall
     
@@ -784,6 +786,13 @@ load_session:
     la $a0, input_buffer
     li $a1, 64
     syscall
+
+    # Check for empty input
+    lb $t0, input_buffer
+    li $t1, 10 # newline
+    beq $t0, $t1, load_fail
+    li $t1, 0  # null
+    beq $t0, $t1, load_fail
 
     # Parse save code
     la $a0, input_buffer
