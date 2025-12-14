@@ -63,8 +63,18 @@
     msg_curr_energy:    .asciiz "Current energy: "
  
     # Quit messages
-    msg_saving:     .asciiz "Saving session... goodbye!\n" # do we need to save&load session?
+    msg_saving:     .asciiz "Saving session... goodbye!\n"
     msg_terminated: .asciiz "--- simulation terminated ---\n"
+
+    # Session
+    save_filename:  .asciiz "save.bin"
+    msg_ask_load:   .asciiz "Load previous session? (Y/N) > "
+    msg_load_ok:    .asciiz "Session loaded successfully!\n"
+    msg_load_fail:  .asciiz "No save file found or load failed. Starting new game.\n\n"
+    msg_save_ok:    .asciiz "Session saved.\n"
+    msg_save_err:   .asciiz "Error saving session.\n"
+    .align 2
+    file_buffer:    .space 20  # 5 words (EDR, MEL, IEL, Energy, Alive)
 
 .text
 .globl main
@@ -83,6 +93,35 @@ main:
     syscall
     la $a0, msg_init
     syscall
+
+    
+    # Ask to load session
+    li $v0, 4
+    la $a0, msg_ask_load
+    syscall
+    
+    # Read input (Y/N)
+    li $v0, 8
+    la $a0, input_buffer
+    li $a1, 12
+    syscall
+    
+    lb $t0, input_buffer
+    li $t1, 'Y'
+    beq $t0, $t1, try_load
+    li $t1, 'y'
+    beq $t0, $t1, try_load
+    
+    j start_new_game
+
+try_load:
+    jal load_session
+    # If load failed ($v0=0), fall through to start_new_game
+    # If load success ($v0=1), jump to game_start_skip_config
+    bnez $v0, game_start_skip_config
+
+start_new_game:
+    li $v0, 4
     la $a0, msg_params
     syscall
 
@@ -108,13 +147,14 @@ main:
     lw $t0, IEL
     sw $t0, current_energy
 
-    li $v0, 4
-    la $a0, msg_alive
-    syscall
-
     # Print end of startup messages
     li $v0, 4
     la $a0, msg_params_set
+    syscall
+
+game_start_skip_config:
+    li $v0, 4
+    la $a0, msg_alive
     syscall
 
     # Echo Parameters
@@ -155,6 +195,19 @@ main:
     
     li $v0, 4
     la $a0, msg_units
+    syscall
+
+    # Print Current Energy
+    li $v0, 4
+    la $a0, msg_curr_energy
+    syscall
+    
+    lw $a0, current_energy
+    li $v0, 1
+    syscall
+    
+    li $v0, 4
+    la $a0, newline
     syscall
 
     # Initialise last_tick with current time (ms)
@@ -205,7 +258,7 @@ main_loop:
     add  $t2, $t2, $t9    # last_tick += time_accounted
     sw   $t2, last_tick
 
-        # [NEW] Print natural depletion message loop
+    # Print natural depletion message loop
     move $t9, $t7        # t9 = num_ticks counter
 
 print_tick_loop:
@@ -511,10 +564,157 @@ quit:
     li $v0, 4
     la $a0, msg_saving
     syscall
+    
+    # Save session
+    jal save_session
+
     la $a0, msg_terminated
     syscall
     li $v0, 10 # exit program
     syscall
+
+# SESSION FUNCTIONS
+
+# ========================================
+# save_session
+#   Writes EDR, MEL, IEL, current_energy, pet_alive to file
+# ========================================
+save_session:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+
+    # Open file in write-only mode
+    li $v0, 13 # syscall 13: open
+    la $a0, save_filename
+    li $a1, 1  # flags: 1 = write-only
+    li $a2, 0  # mode: ignored
+    syscall
+    move $s0, $v0 # save file descriptor
+
+    bltz $s0, save_error
+
+    # Prepare buffer (Copy variables to contiguous memory)
+    la $t0, file_buffer
+    
+    lw $t1, EDR
+    sw $t1, 0($t0)
+    
+    lw $t1, MEL
+    sw $t1, 4($t0)
+    
+    lw $t1, IEL
+    sw $t1, 8($t0)
+    
+    lw $t1, current_energy
+    sw $t1, 12($t0)
+    
+    lw $t1, pet_alive
+    sw $t1, 16($t0)
+
+    # Write to save file
+    li $v0, 15       # syscall 15: write
+    move $a0, $s0      # file descriptor
+    la $a1, file_buffer
+    li $a2, 20       # write 5 words
+    syscall
+
+    # 4. Close file
+    li $v0, 16       # syscall 16: close
+    move $a0, $s0
+    syscall
+    
+    li $v0, 4
+    la $a0, msg_save_ok
+    syscall
+    
+    j save_done
+
+save_error:
+    li $v0, 4
+    la $a0, msg_save_err
+    syscall
+
+save_done:
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr $ra
+
+# ========================================
+# load_session
+#   Reads data from file
+#   Returns $v0=1 if success, 0 if fail
+# ========================================
+load_session:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+
+    # Open file in read only mode
+    li $v0, 13 # syscall 13: open
+    la $a0, save_filename
+    li $a1, 0  # flags: 0 = read-only
+    li $a2, 0
+    syscall
+    move $s0, $v0 # save file descriptor to $s0
+
+    bltz $s0, load_fail
+
+    # Read from file
+    li $v0, 14 # syscall 14: read
+    move $a0, $s0
+    la $a1, file_buffer
+    li $a2, 20
+    syscall
+    
+    # Check if we read 20 bytes
+    li $t0, 20
+    bne $v0, $t0, load_close_fail
+
+    # Restore variables from buffer
+    la $t0, file_buffer
+    
+    lw $t1, 0($t0)
+    sw $t1, EDR
+    
+    lw $t1, 4($t0)
+    sw $t1, MEL
+    
+    lw $t1, 8($t0)
+    sw $t1, IEL
+    
+    lw $t1, 12($t0)
+    sw $t1, current_energy
+    
+    lw $t1, 16($t0)
+    sw $t1, pet_alive
+
+    # Close file
+    li $v0, 16
+    move $a0, $s0
+    syscall
+
+    li $v0, 4
+    la $a0, msg_load_ok
+    syscall
+    
+    li $v0, 1 # return success
+    j load_done
+
+load_close_fail:
+    # also close file if read failed
+    li $v0, 16
+    move $a0, $s0
+    syscall
+
+load_fail:
+    li $v0, 4
+    la $a0, msg_load_fail
+    syscall
+    li $v0, 0 # return fail
+
+load_done:
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
+    jr $ra
 
 # DATA LAYER
 
