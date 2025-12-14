@@ -22,6 +22,8 @@
     msg_units_sec:  .asciiz " units/sec\n"
 
     msg_alive:      .asciiz "Your Digital Pet is alive! Current status:\n"
+    msg_died1:       .asciiz "Error, energy level equal or less than 0. DP is dead!\n"
+    msg_died2:       .asciiz " *** Your Digital Pet has died! ***\n"
     
     # Command prompt
     msg_prompt:     .asciiz "Enter a command (F, E, P, I, R, Q) > "
@@ -43,7 +45,7 @@
     msg_ignore_result:  .asciiz "Current energy: "
  
     # Quit messages
-    msg_saving:     .asciiz "Saving session... goodbye!\n"
+    msg_saving:     .asciiz "Saving session... goodbye!\n" # do we need to save&load session?
     msg_terminated: .asciiz "--- simulation terminated ---\n"
 
 .text
@@ -311,42 +313,79 @@ parse_done:
 # just to test successfully parsed
 # feel free to delete/change this lol
 feed:
-    li $v0, 4
+    addi $sp, $sp, -8
+    sw $ra, 4($sp)
+    sw $s0, 0($sp)
+    move $s0, $a0 # Save n to $s0
+
+    move $a1, $s0
     la $a0, msg_cmd_feed
-    syscall
+    jal print_cmd_success
+
+    # TODO: Feed
+
+    lw $s0, 0($sp)
+    lw $ra, 4($sp)
+    addi $sp, $sp, 8
     jr $ra
 
 entertain:
-    li $v0, 4
+    addi $sp, $sp, -8
+    sw $ra, 4($sp)
+    sw $s0, 0($sp)
+
+    move $s0, $a0 # Save n to $s0
+
+    move $a1, $s0
     la $a0, msg_cmd_enter
-    syscall
+    jal print_cmd_success
+
+    # TODO: Entertain
+
+    lw $s0, 0($sp)
+    lw $ra, 4($sp)
+    addi $sp, $sp, 8
     jr $ra
 
 pet:
-    li $v0, 4
+    addi $sp, $sp, -8
+    sw $ra, 4($sp)
+    sw $s0, 0($sp)
+
+    move $s0, $a0 # Save n to $s0
+
+    move $a1, $s0
     la $a0, msg_cmd_pet
-    syscall
+    jal print_cmd_success
+
+    # TODO: Pet
+
+    lw $s0, 0($sp)
+    lw $ra, 4($sp)
+    addi $sp, $sp, 8
     jr $ra
 
 ignore:
-    move $t0, $a0 # t0 = n
-    li $v0, 4
-    la $a0, msg_cmd_ignore
-    syscall
+    addi $sp, $sp, -8
+    sw $ra, 4($sp)
+    sw $s0, 0($sp)
 
-    li $v0, 4
-    la $a0, newline
-    syscall
+    move $s0, $a0 # Save n to $s0
+
+    # Print command recognized
+    move $a1, $s0
+    la $a0, msg_cmd_ignore
+    jal print_cmd_success
 
     li $t1, 3
-    mul $t2, $t0, $t1 # t2(damage) = n * 3
+    mul $t2, $s0, $t1 # t2(damage) = n * 3
     
     lw $t3, current_energy
     sub $t3, $t3, $t2 # t3 = new energy
     sw $t3, current_energy
 
     li $v0, 4
-    la $a0, msg_ignore_loss
+    la $a0, msg_ignore_loss # Print "Energy decreased by "
     syscall
 
     move $a0, $t2
@@ -369,6 +408,9 @@ ignore:
     la $a0, newline
     syscall
 
+    lw $s0, 0($sp)
+    lw $ra, 4($sp)
+    addi $sp, $sp, 8
     jr $ra
 
 reset:
@@ -392,6 +434,8 @@ reset:
 
 quit:
     li $v0, 4
+    la $a0, msg_saving
+    syscall
     la $a0, msg_terminated
     syscall
     li $v0, 10 # exit program
@@ -425,6 +469,30 @@ print_char:
     li      $v0, 11
     syscall
     jr      $ra
+
+# ========================================
+# print_cmd_success
+#   print "Command recognized: [Name] [Arg]."
+#   $a0: Address of command name string
+#   $a1: Integer argument value
+# ========================================
+print_cmd_success:
+    li $v0, 4
+    syscall
+
+    move $a0, $a1
+    li $v0, 1 # print n
+    syscall
+    
+    li $a0, 46 # 46 is '.'
+    li $v0, 11 # print .
+    syscall
+    
+    la $a0, newline
+    li $v0, 4
+    syscall
+    
+    jr $ra
 
 # ========================================
 # str_to_int
