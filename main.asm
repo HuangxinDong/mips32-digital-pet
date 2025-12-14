@@ -1,3 +1,9 @@
+# ========================================
+# MIPS Digital Pet Group C
+#
+# 
+# ========================================
+
 .data
     EDR:            .word   1           # Energy Depletion Rate (units/sec)
     MEL:            .word   15          # Maximum Energy Level
@@ -54,8 +60,12 @@
 .text
 .globl main
 
-
 # MAIN PROGRAM
+
+# ========================================
+# main
+#   Get startup config and call main loop
+# ========================================
 
 main:
     # Print startup messages
@@ -146,6 +156,11 @@ main:
     
 # Main game loop
 
+# ========================================
+# main_loop
+#   Get user input and call parse_command
+# ========================================
+
 main_loop:
 
     # (A) if pet is dead, skip depletion
@@ -230,9 +245,6 @@ handle_death:
     syscall
     j after_depletion
 
-
-
-
 # INITIALIZE SYSTEM
 
 # ========================================
@@ -285,6 +297,11 @@ read_config_done:
     jr $ra
 
 # COMMAND PARSING
+
+# ========================================
+# parse_command
+#   parse the command entered by the user
+# ========================================
 
 parse_command:
     addi $sp, $sp, -12
@@ -348,7 +365,6 @@ check_cmd_type:
     syscall
     j parse_done
 
-
 do_feed:
     move $a0, $s1
     jal feed
@@ -386,8 +402,11 @@ parse_done:
     addi $sp, $sp, 12
     jr $ra
 
+# EXECUTE COMMANDS
 
-# EXECUTE COMANDS
+# ========================================
+# feed
+# ========================================
 
 # just to test successfully parsed
 # feel free to delete/change this lol
@@ -408,6 +427,10 @@ feed:
     addi $sp, $sp, 8
     jr $ra
 
+# ========================================
+# entertain
+# ========================================
+
 entertain:
     addi $sp, $sp, -8
     sw $ra, 4($sp)
@@ -426,6 +449,10 @@ entertain:
     addi $sp, $sp, 8
     jr $ra
 
+# ========================================
+# pet
+# ========================================
+
 pet:
     addi $sp, $sp, -8
     sw $ra, 4($sp)
@@ -443,6 +470,10 @@ pet:
     lw $ra, 4($sp)
     addi $sp, $sp, 8
     jr $ra
+
+# ========================================
+# ignore
+# ========================================
 
 ignore:
     addi $sp, $sp, -8
@@ -492,6 +523,10 @@ ignore:
     addi $sp, $sp, 8
     jr $ra
 
+# ========================================
+# reset
+# ========================================
+
 reset:
     li $v0, 4
     la $a0, msg_cmd_reset
@@ -517,6 +552,10 @@ reset:
     syscall
     
     jr $ra
+
+# ========================================
+# quit
+# ========================================
 
 quit:
     li $v0, 4
@@ -562,6 +601,7 @@ print_char:
 #   $a0: Address of command name string
 #   $a1: Integer argument value
 # ========================================
+
 print_cmd_success:
     li $v0, 4
     syscall
@@ -583,7 +623,7 @@ print_cmd_success:
 # ========================================
 # str_to_int
 #   converts ascii strings to integers
-#   [!] This won't handle non-int strings
+#   gracefully catches invalid inputs (returns -1)
 # ========================================
 
 str_to_int:
