@@ -9,15 +9,21 @@
 # ========================================
 
 .data
+    # Global Variables & State
     EDR:            .word   1           # Energy Depletion Rate (units/sec)
     MEL:            .word   15          # Maximum Energy Level
     IEL:            .word   10          # Initial Energy Level
     current_energy: .word   10          # Current energy (initialized to IEL)
-    pet_alive:      .word   1
-    last_tick:      .word   0
-    input_buffer:   .space  12          # A buffer for the input string
+    pet_alive:      .word   1           # 1 = Alive, 0 = Dead
+    last_tick:      .word   0           # Timestamp of last energy update
     
-    # Startup messages
+    # Increased buffer size to handle save codes (e.g., "1 15 10 100 1")
+    input_buffer:   .space  64          
+
+    # String Constants
+    newline:        .asciiz "\n"
+    
+    # Startup & Config
     msg_title:      .asciiz "=== Digital Pet Simulator (MIPS32) ===\n"
     msg_init:       .asciiz "Initializing system...\n\n"
     msg_params:     .asciiz "Please set parameters (press Enter for default):\n"
@@ -50,7 +56,6 @@
     msg_cmd_reset:  .asciiz "Command recognized: Reset "
     msg_cmd_quit:   .asciiz "Command recognized: Quit "
     msg_cmd_invalid: .asciiz "Invalid command! Please try again."
-    newline:        .asciiz "\n"
     msg_cmd_rec:    .asciiz "Command recognized: "
 
     # Reset and Ignore messages
@@ -63,18 +68,17 @@
     msg_curr_energy:    .asciiz "Current energy: "
  
     # Quit messages
-    msg_saving:     .asciiz "Saving session... goodbye!\n"
-    msg_terminated: .asciiz "--- simulation terminated ---\n"
+    # Quit messages
+    msg_saving:     .asciiz "Saving session... goodbye!\nSave Code: "
+    msg_terminated: .asciiz "\n--- simulation terminated ---\n"
 
-    # Session
-    save_filename:  .asciiz "save.bin"
-    msg_ask_load:   .asciiz "Load previous session? (Y/N) > "
-    msg_load_ok:    .asciiz "Session loaded successfully!\n"
-    msg_load_fail:  .asciiz "No save file found or load failed. Starting new game.\n\n"
-    msg_save_ok:    .asciiz "Session saved.\n"
-    msg_save_err:   .asciiz "Error saving session.\n"
-    .align 2
-    file_buffer:    .space 20  # 5 words (EDR, MEL, IEL, Energy, Alive)
+    # Session Management
+    msg_ask_load:     .asciiz "Do you want to restore a previous game? (Y/N) > "
+    msg_load_instr:   .asciiz "Enter your Save Code:\n"
+    msg_load_example: .asciiz "Example: 17829342\n"
+    msg_load_prompt:  .asciiz "> "
+    msg_load_success: .asciiz "Game state restored successfully!\n"
+    msg_load_invalid: .asciiz "Invalid Save Code! Starting new game.\n\n"
 
 .text
 .globl main
@@ -566,10 +570,11 @@ quit:
     li $v0, 4
     la $a0, msg_saving
     syscall
-    
+
     # Save session
     jal save_session
 
+    li $v0, 4
     la $a0, msg_terminated
     syscall
     li $v0, 10 # exit program
@@ -577,145 +582,114 @@ quit:
 
 # SESSION FUNCTIONS
 
-# ========================================
-# save_session
-#   Writes EDR, MEL, IEL, current_energy, pet_alive to file
-# ========================================
 save_session:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
 
-    # Open file in write-only mode
-    li $v0, 13 # syscall 13: open
-    la $a0, save_filename
-    li $a1, 1  # flags: 1 = write-only
-    li $a2, 0  # mode: ignored
-    syscall
-    move $s0, $v0 # save file descriptor
-
-    bltz $s0, save_error
-
-    # Prepare buffer (Copy variables to contiguous memory)
-    la $t0, file_buffer
+    # Pack variables into one 32-bit integer
+    # Structure: [EDR (8)] [MEL (8)] [IEL (8)] [ENERGY (8)], since this ensures the number is positive (MSB=0) as long as EDR < 128
     
-    lw $t1, EDR
-    sw $t1, 0($t0)
+    lw $t0, EDR
+    sll $t0, $t0, 8 # Shift left 8
     
     lw $t1, MEL
-    sw $t1, 4($t0)
+    or $t0, $t0, $t1 # combine
+    sll $t0, $t0, 8
     
     lw $t1, IEL
-    sw $t1, 8($t0)
+    or $t0, $t0, $t1
+    sll $t0, $t0, 8
     
     lw $t1, current_energy
-    sw $t1, 12($t0)
+    or $t0, $t0, $t1
     
-    lw $t1, pet_alive
-    sw $t1, 16($t0)
-
-    # Write to save file
-    li $v0, 15       # syscall 15: write
-    move $a0, $s0      # file descriptor
-    la $a1, file_buffer
-    li $a2, 20       # write 5 words
-    syscall
-
-    # 4. Close file
-    li $v0, 16       # syscall 16: close
-    move $a0, $s0
+    # Obfuscate with XOR Key (0x12345678)
+    xori $t0, $t0, 0x12345678
+    
+    # Print save code
+    li $v0, 1
+    move $a0, $t0
     syscall
     
-    li $v0, 4
-    la $a0, msg_save_ok
+    li $v0, 11
+    li $a0, 10 # newline
     syscall
     
-    j save_done
-
-save_error:
-    li $v0, 4
-    la $a0, msg_save_err
-    syscall
-
-save_done:
     lw $ra, 0($sp)
     addi $sp, $sp, 4
     jr $ra
 
-# ========================================
-# load_session
-#   Reads data from file
-#   Returns $v0=1 if success, 0 if fail
-# ========================================
 load_session:
-    addi $sp, $sp, -4
-    sw $ra, 0($sp)
-
-    # Open file in read only mode
-    li $v0, 13 # syscall 13: open
-    la $a0, save_filename
-    li $a1, 0  # flags: 0 = read-only
-    li $a2, 0
-    syscall
-    move $s0, $v0 # save file descriptor to $s0
-
-    bltz $s0, load_fail
-
-    # Read from file
-    li $v0, 14 # syscall 14: read
-    move $a0, $s0
-    la $a1, file_buffer
-    li $a2, 20
-    syscall
-    
-    # Check if we read 20 bytes
-    li $t0, 20
-    bne $v0, $t0, load_close_fail
-
-    # Restore variables from buffer
-    la $t0, file_buffer
-    
-    lw $t1, 0($t0)
-    sw $t1, EDR
-    
-    lw $t1, 4($t0)
-    sw $t1, MEL
-    
-    lw $t1, 8($t0)
-    sw $t1, IEL
-    
-    lw $t1, 12($t0)
-    sw $t1, current_energy
-    
-    lw $t1, 16($t0)
-    sw $t1, pet_alive
-
-    # Close file
-    li $v0, 16
-    move $a0, $s0
-    syscall
+    addi $sp, $sp, -8
+    sw $ra, 4($sp)
+    sw $s0, 0($sp)
 
     li $v0, 4
-    la $a0, msg_load_ok
+    la $a0, msg_load_instr
     syscall
-    
-    li $v0, 1 # return success
-    j load_done
+    la $a0, msg_load_example
+    syscall
+    la $a0, msg_load_prompt
+    syscall
 
-load_close_fail:
-    # also close file if read failed
-    li $v0, 16
-    move $a0, $s0
+    # Read input line
+    li $v0, 8
+    la $a0, input_buffer
+    li $a1, 64
     syscall
+
+    # Parse save code
+    la $a0, input_buffer
+    jal str_to_int
+    li $t0, -1
+    beq $v0, $t0, load_fail
+    
+    # Decrypt: XOR with Key
+    xori $t0, $v0, 0x12345678
+    
+    # Unpack EDR MEL IEL ENERGY
+
+    # Extract Energy
+    andi $t1, $t0, 0xFF
+    sw $t1, current_energy
+    srl $t0, $t0, 8
+
+    # Extract IEL
+    andi $t1, $t0, 0xFF
+    sw $t1, IEL
+    srl $t0, $t0, 8
+
+    # Extract MEL
+    andi $t1, $t0, 0xFF
+    sw $t1, MEL
+    srl $t0, $t0, 8
+    
+    # Extract EDR
+    andi $t1, $t0, 0xFF
+    sw $t1, EDR
+    
+    # Restore alive status
+    lw $t1, current_energy
+    li $t2, 0
+    sgt $t2, $t1, $zero # if energy > 0, alive=1
+    sw $t2, pet_alive
+
+    li $v0, 4
+    la $a0, msg_load_success
+    syscall
+    li $v0, 1
+    j load_done
 
 load_fail:
     li $v0, 4
-    la $a0, msg_load_fail
+    la $a0, msg_load_invalid
     syscall
-    li $v0, 0 # return fail
+    li $v0, 0
 
 load_done:
-    lw $ra, 0($sp)
-    addi $sp, $sp, 4
+    lw $s0, 0($sp)
+    lw $ra, 4($sp)
+    addi $sp, $sp, 8
     jr $ra
 
 # DATA LAYER
@@ -771,24 +745,6 @@ update_energy_store_energy:
 
 # UTILITY FUNCTIONS
 
-print_string:
-    # Print null-terminated string in $a0
-    li      $v0, 4
-    syscall
-    jr      $ra
-
-print_int:
-    # Print integer in $a0
-    li      $v0, 1
-    syscall
-    jr      $ra
-
-print_char:
-    # Print character in $a0
-    li      $v0, 11
-    syscall
-    jr      $ra
-
 # ========================================
 # print_cmd_success
 #   print "Command recognized: [Name] [Arg]."
@@ -839,6 +795,9 @@ str_to_int_loop:
     beq $t0, $t3, str_to_int_done
 
     li $t3, 10
+    beq $t0, $t3, str_to_int_done
+
+    li $t3, 32  # space
     beq $t0, $t3, str_to_int_done
 
     # Check bounds
