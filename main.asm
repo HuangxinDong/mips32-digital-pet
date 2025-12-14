@@ -16,7 +16,8 @@
     pet_alive:      .word   1
     last_tick:      .word   0
     input_buffer:   .space  12          # A buffer for the input string
-    
+    pet_sleeping:   .word   0   # 0 = awake, 1 = sleeping
+
     # Startup messages
     msg_title:      .asciiz "=== Digital Pet Simulator (MIPS32) ===\n"
     msg_init:       .asciiz "Initializing system...\n\n"
@@ -40,7 +41,7 @@
     msg_dead_block:  .asciiz "Your pet is dead! You must Reset (R) or Quit (Q).\n"
     
     # Command prompt
-    msg_prompt:     .asciiz "Enter a command (F, E, P, I, R, Q) > "
+    msg_prompt:     .asciiz "Enter a command (F, E, P, I, S, R, Q) > "
     
     # Command recognized messages
     msg_cmd_feed:   .asciiz "Command recognized: Feed "
@@ -52,6 +53,8 @@
     msg_cmd_invalid: .asciiz "Invalid command! Please try again."
     newline:        .asciiz "\n"
     msg_cmd_rec:    .asciiz "Command recognized: "
+    msg_sleep:      .asciiz "Your pet is sleeping\n"
+    msg_wake:       .asciiz "Your pet woke up\n"
 
     # Reset and Ignore messages
     msg_reset_done:     .asciiz "Digital Pet has been reset to its initial state!\n"
@@ -176,6 +179,19 @@ main_loop:
     lw   $t0, pet_alive
     beq  $t0, $zero, after_depletion
 
+    # (A.1) if pet is sleeping, skip depletion
+    lw   $t0, pet_sleeping
+    beq  $t0, $zero, do_depletion   # if awake → do normal depletion
+    j    sleep_skip_depletion       # if sleeping → skip
+
+sleep_skip_depletion:
+    # reset last_tick so time doesn't accumulate
+    li  $v0, 30
+    syscall
+    sw  $a0, last_tick
+    j after_depletion
+
+do_depletion:
     # (B) check how many seconds passed since last_tick
     li   $v0, 30          # get current time (ms)
     syscall
@@ -402,6 +418,9 @@ check_cmd_type:
     li $t2, 'Q'
     beq $s0, $t2, do_quit
 
+    li $t2, 'S'
+    beq $s0, $t2, do_sleep
+
     # Invalid command
     li $v0, 4
     la $a0, msg_cmd_invalid
@@ -463,6 +482,32 @@ do_quit:
     move $a0, $s1
     jal quit
     j parse_done
+
+do_sleep:
+    lw  $t0, pet_sleeping
+    xori $t0, $t0, 1      # toggle sleep state
+    sw  $t0, pet_sleeping
+
+    beq  $t0, $zero, woke_up
+
+    # now sleeping
+    li  $v0, 4
+    la  $a0, msg_sleep
+    syscall
+    j parse_done
+
+woke_up:
+    li  $v0, 4
+    la  $a0, msg_wake
+    syscall
+
+    # reset last_tick on wake
+    li  $v0, 30
+    syscall
+    sw  $a0, last_tick
+
+    j parse_done
+
 
 parse_done:
     lw $s1, 0($sp)
