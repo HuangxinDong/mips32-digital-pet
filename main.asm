@@ -9,6 +9,8 @@
     MEL:            .word   15          # Maximum Energy Level
     IEL:            .word   10          # Initial Energy Level
     current_energy: .word   10          # Current energy (initialized to IEL)
+    pet_alive:      .word   1
+    last_tick:      .word   0
     input_buffer:   .space  12          # A buffer for the input string
     
     # Startup messages
@@ -30,6 +32,7 @@
     msg_alive:      .asciiz "Your Digital Pet is alive! Current status:\n"
     msg_died1:       .asciiz "Error, energy level equal or less than 0. DP is dead!\n"
     msg_died2:       .asciiz " *** Your Digital Pet has died! ***\n"
+    msg_dead_block:  .asciiz "Your pet is dead! You must Reset (R) or Quit (Q).\n"
     
     # Command prompt
     msg_prompt:     .asciiz "Enter a command (F, E, P, I, R, Q) > "
@@ -96,6 +99,10 @@ main:
     lw $t0, IEL
     sw $t0, current_energy
 
+    li $v0, 4
+    la $a0, msg_alive
+    syscall
+
     # Print end of startup messages
     li $v0, 4
     la $a0, msg_params_set
@@ -141,6 +148,12 @@ main:
     la $a0, msg_units
     syscall
 
+    # Initialise last_tick with current time (ms)
+    li  $v0, 30
+    syscall
+    sw  $v0, last_tick
+    
+    
 # Main game loop
 
 # ========================================
@@ -149,6 +162,38 @@ main:
 # ========================================
 
 main_loop:
+
+    # (A) if pet is dead, skip depletion
+    lw   $t0, pet_alive
+    beq  $t0, $zero, after_depletion
+
+    # (B) check if 1 second passed since last_tick
+    li   $v0, 30          # get current time (ms)
+    syscall
+    move $t1, $v0         # t1 = current_time
+
+    lw   $t2, last_tick   # t2 = last_tick
+    sub  $t3, $t1, $t2    # t3 = elapsed time
+
+    li   $t4, 1000
+    blt  $t3, $t4, after_depletion
+
+
+    # (C) if yes, subtract EDR and update last_tick
+    lw   $t5, current_energy
+    lw   $t6, EDR
+    sub  $t5, $t5, $t6
+    sw   $t5, current_energy
+    sw   $t1, last_tick   # last_tick = current_time
+
+
+    # (D) if energy <= 0, clamp to 0, set pet_alive=0, print death messages
+    blez $t5, handle_death
+    j    after_depletion
+
+after_depletion:
+
+
     # Print command prompt
     li $v0, 4
     la $a0, msg_prompt
@@ -160,9 +205,45 @@ main_loop:
     li $a1, 12
     syscall
 
+    # Block commands if pet is dead (only allow R or Q)
+    lw  $t0, pet_alive
+    bne $t0, $zero, allow_command
+
+    la  $t1, input_buffer
+    lb  $t2, 0($t1)
+
+    li  $t3, 'R'
+    beq $t2, $t3, allow_command
+
+    li  $t3, 'Q'
+    beq $t2, $t3, allow_command
+
+    # Otherwise reject
+    li  $v0, 4
+    la  $a0, msg_dead_block
+    syscall
+    j   main_loop
+
+allow_command:
+
     jal parse_command
 
-    j main_loop # while loop
+    j main_loop # --- END OF WHILE LOOP ---
+
+
+handle_death:
+    li   $t7, 0
+    sw   $t7, current_energy
+    sw   $t7, pet_alive
+
+    li   $v0, 4
+    la   $a0, msg_died1
+    syscall
+
+    li   $v0, 4
+    la   $a0, msg_died2
+    syscall
+    j after_depletion
 
 # INITIALIZE SYSTEM
 
@@ -458,7 +539,14 @@ reset:
     # current_energy = IEL
     lw $t0, IEL
     sw $t0, current_energy
-    
+
+    li  $t1, 1
+    sw  $t1, pet_alive
+
+    li  $v0, 30
+    syscall
+    sw  $v0, last_tick
+
     li $v0, 4
     la $a0, msg_reset_done
     syscall
