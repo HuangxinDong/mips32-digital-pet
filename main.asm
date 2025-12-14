@@ -40,7 +40,7 @@
     msg_dead_block:  .asciiz "Your pet is dead! You must Reset (R) or Quit (Q).\n"
     
     # Command prompt
-    msg_prompt:     .asciiz "Enter a command (F, E, P, I, R, Q) > "
+    msg_prompt:     .asciiz "Enter a command: \n F to Feed \n E to Entertain \n P to Pet \n I to Ignore \n R to Reset \n Q to Quit \n> "
     
     # Command recognized messages
     msg_cmd_feed:   .asciiz "Command recognized: Feed "
@@ -65,6 +65,12 @@
     # Quit messages
     msg_saving:     .asciiz "Saving session... goodbye!\n" # do we need to save&load session?
     msg_terminated: .asciiz "--- simulation terminated ---\n"
+
+     # Messages to display math formatting
+    msg_inc_by: .asciiz "Energy increased by: "
+    msg_lparen: .asciiz " ("
+    msg_x: .asciiz "x"
+    msg_rparen: .asciiz ")\n"
 
 .text
 .globl main
@@ -198,7 +204,6 @@ main_loop:
     mul  $t8, $t7, $t6    # t8 = total_damage = num_ticks * EDR
     sub  $t5, $t5, $t8    # current_energy -= total_damage
     sw   $t5, current_energy
-    
     # Update last_tick by adding (num_ticks * 1000)
     # This keeps the remainder milliseconds for the next loop (accuracy)
     mul  $t9, $t7, $t4    # t9 = time_accounted (ms)
@@ -417,6 +422,19 @@ do_feed:
 
     move $a0, $s1
     li $a1, 1
+
+    li $v0, 4
+    la $a0, msg_inc_by
+    syscall
+
+    move $a0, $s1
+    li $v0, 1
+    syscall
+    
+    li $v0, 4
+    la $a0, msg_units
+    syscall
+
     jal update_energy
 
     j parse_done
@@ -428,6 +446,36 @@ do_entertain:
 
     move $a0, $s1
     li $a1, 2
+
+    mul $t0, $s1, 2 
+
+    li $v0, 4
+    la $a0, msg_inc_by
+    syscall
+
+    move $a0, $t0 
+    li $v0, 1
+    syscall
+
+    li $v0, 4
+    la $a0, msg_units
+    syscall
+    li $v0, 4
+    la $a0, msg_lparen
+    syscall
+    li $v0, 1
+    li $a0, 2
+    syscall
+    li $v0, 4
+    la $a0, msg_x
+    syscall
+    li $v0, 1
+    move $a0, $s1
+    syscall
+    li $v0, 4
+    la $a0, msg_rparen
+    syscall
+
     jal update_energy
 
     j parse_done
@@ -439,6 +487,36 @@ do_pet:
 
     move $a0, $s1
     li $a1, 2
+
+    mul $t0, $s1, 2 
+
+    li $v0, 4
+    la $a0, msg_inc_by
+    syscall
+
+    move $a0, $t0
+    li $v0, 1
+    syscall
+
+    li $v0, 4
+    la $a0, msg_units
+    syscall
+    li $v0, 4
+    la $a0, msg_lparen
+    syscall
+    li $v0, 1
+    li $a0, 2
+    syscall
+    li $v0, 4
+    la $a0, msg_x
+    syscall
+    li $v0, 1
+    move $a0, $s1
+    syscall
+    li $v0, 4
+    la $a0, msg_rparen
+    syscall
+
     jal update_energy
 
     j parse_done
@@ -450,6 +528,35 @@ do_ignore:
 
     move $a0, $s1
     li $a1, -3
+
+    mul $t0, $s1, 3
+
+    li $v0, 4
+    la $a0, msg_ignore_loss 
+    syscall
+
+    move $a0, $t0 
+    li $v0, 1
+    syscall
+
+    li $v0, 4
+    la $a0, msg_lparen
+    syscall
+
+    li $v0, 1
+    li $a0, 3
+    syscall
+
+    li $v0, 4
+    la $a0, msg_x
+    syscall
+    li $v0, 1
+    move $a0, $s1 
+    syscall
+    li $v0, 4
+    la $a0, msg_rparen
+    syscall
+
     jal update_energy
 
     j parse_done
