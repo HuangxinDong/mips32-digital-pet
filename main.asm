@@ -150,7 +150,7 @@ main_loop:
 
     # (A) if pet is dead, skip depletion
     lw   $t0, pet_alive
-    beq  $t0, $zero, skip_depletion
+    beq  $t0, $zero, after_depletion
 
     # (B) check if 1 second passed since last_tick
     li   $v0, 30          # get current time (ms)
@@ -161,7 +161,7 @@ main_loop:
     sub  $t3, $t1, $t2    # t3 = elapsed time
 
     li   $t4, 1000
-    blt  $t3, $t4, skip_depletion
+    blt  $t3, $t4, after_depletion
 
 
     # (C) if yes, subtract EDR and update last_tick
@@ -176,8 +176,8 @@ main_loop:
     blez $t5, handle_death
     j    after_depletion
 
-    skip_depletion:
-    after_depletion:
+after_depletion:
+
 
     # Print command prompt
     li $v0, 4
@@ -213,9 +213,10 @@ allow_command:
 
     jal parse_command
 
-    j main_loop # while loop
+    j main_loop # --- END OF WHILE LOOP ---
 
-    handle_death:
+
+handle_death:
     li   $t7, 0
     sw   $t7, current_energy
     sw   $t7, pet_alive
@@ -227,7 +228,7 @@ allow_command:
     li   $v0, 4
     la   $a0, msg_died2
     syscall
-    j skip_depletion
+    j after_depletion
 
 
 
