@@ -1431,6 +1431,9 @@ print_update_energy__val:
     la $a0, msg_units2
     syscall
 
+    li $t3, 1
+    beq $t1, $t3, print_update_energy__done
+
     li $v0, 4
     la $a0, msg_lparen
     syscall
