@@ -11,7 +11,7 @@ Save/Load System: Developed a serialization mechanism that packs game state vari
 
 Sleep Mode: The user can make their pet sleep using the 'S' command for some time, and press 'S' again to wake it up. This feature pauses the natural energy depletion cycle. While active, standard interaction commands are inhibited to simulate rest, though specific non-intrusive interactions trigger unique feedback without altering game state.
 
-Leveling & Progression: Integrated a progression mechanic based on the accumulation of positive user interactions. Higher levels serve as prerequisites for unlocking advanced features and contribute to the final performance evaluation.
+Leveling & Progression: Integrated a dynamic progression mechanic where the difficulty scales linearly with the pet's level (Threshold = 5 + Level*2). Leveling up grants permanent stat boosts (Max Energy +5) and immediate resource bonuses, while higher levels unlock advanced features and milestones.
 
 Dating Simulation: An advanced interaction feature unlocked at Level 2. It utilizes pseudo-random number generation to determine diverse narrative outcomes—ranging from positive energy boosts to humorous "Easter egg" events—adding variety to the gameplay loop.
 

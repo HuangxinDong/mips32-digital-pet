@@ -82,7 +82,10 @@
     msg_dating_cat:      .asciiz "The date was awkward... the other pet turned out to be a cat!\n"
     msg_dating_movie:    .asciiz "They went to see a movie and had a great time.\n"
     msg_level:      .asciiz "Level: "
-    msg_level_up:   .asciiz "Level up! Current level: "
+    msg_level_up:   .asciiz "\n*** LEVEL UP! ***\nCurrent level: "
+    msg_bonus:      .asciiz "  [Bonus] Max Energy +5! Current Energy +5!\n"
+    msg_milestone_5:.asciiz "  [Milestone] Level 5 reached! You are a dedicated owner!\n\n"
+    msg_milestone_10:.asciiz "  [Milestone] Level 10 reached! Legendary status!\n\n"
 
     # Reset and Ignore messages
     msg_reset_done:     .asciiz "Digital Pet has been reset to its initial state!\n"
@@ -116,7 +119,7 @@
     msg_analysis_intro:  .asciiz "Analysis: "
     msg_analysis_good:   .asciiz "Amazing job! You are a true Pet Master!\n"
     msg_analysis_bad:    .asciiz "Oh no... Your pet needs more love and care.\n"
-    msg_analysis_avg:    .asciiz "Not bad, but there is room for improvement.\n"
+    msg_analysis_avg:    .asciiz "Not bad! Keep going — there's still room to improve.\n"
     msg_load_invalid: .asciiz "Invalid Save Code! Starting new game.\n\n"
 
     # Strings for displaying the energy bar
@@ -931,7 +934,11 @@ increase_positive:
     addi $t3, $t3, 1
     sw  $t3, total_positive_actions
 
-    li  $t1, 5
+    # Calculate Threshold = 5 + (Level * 2)
+    lw  $t1, level
+    mul $t1, $t1, 2
+    addi $t1, $t1, 5
+
     blt $t0, $t1, inc_done
 
     # level up
@@ -943,23 +950,69 @@ increase_positive:
     sw  $t2, level
 
     li  $v0, 4
+    la  $a0, newline
+    syscall
     la  $a0, msg_level_up
     syscall
     
-    
-    lw  $a0, level
+    move $a0, $t2
     li  $v0, 1
     syscall
     
-    la  $a0, newline
     li  $v0, 4
+    la  $a0, newline
     syscall
+
+    # Increase MEL by 5
+    lw  $t4, MEL
+    addi $t4, $t4, 5
+    
+    # Cap MEL at 10000
+    li  $t5, 10000
+    ble $t4, $t5, save_new_mel
+    move $t4, $t5
+
+save_new_mel:
+    sw  $t4, MEL
+
+    # Add 5 to current energy as levelup bonus
+    lw  $t5, current_energy
+    addi $t5, $t5, 5
+    sw  $t5, current_energy
+
+    # Print Bonus
+    li  $v0, 4
+    la  $a0, msg_bonus
+    syscall
+
+    # milestones
+    lw  $t2, level
+    
+    li  $t6, 5
+    beq $t2, $t6, print_milestone_5
+    
+    li  $t6, 10
+    beq $t2, $t6, print_milestone_10
+    
+    j inc_done
+
+print_milestone_5:
+    li  $v0, 4
+    la  $a0, msg_milestone_5
+    syscall
+    j inc_done
+
+print_milestone_10:
+    li  $v0, 4
+    la  $a0, msg_milestone_10
+    syscall
+    j inc_done
 
 inc_done:
     jr $ra
 
 # ========================================
-# datiing
+# dating
 # ========================================
 
 do_dating:
