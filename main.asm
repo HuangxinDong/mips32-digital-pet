@@ -1224,6 +1224,12 @@ save_session:
     addi $sp, $sp, 4
     jr $ra
 
+# ========================================
+# load_session (ls__)
+#   loads a saved session into the various
+#   game variables.
+# ========================================
+
 load_session:
     addi $sp, $sp, -8
     sw $ra, 4($sp)
@@ -1246,15 +1252,15 @@ load_session:
     # Check for empty input
     lb $t0, input_buffer
     li $t1, 10 # newline
-    beq $t0, $t1, load_fail
+    beq $t0, $t1, ls__load_fail
     li $t1, 0  # null
-    beq $t0, $t1, load_fail
+    beq $t0, $t1, ls__load_fail
 
     # Parse save code1
     la $a0, input_buffer
     jal str_to_int
     li $t0, -1
-    beq $v0, $t0, load_fail
+    beq $v0, $t0, ls__load_fail
     
     # Decrypt code1: XOR with Key
     xori $t0, $v0, 0x12345678
@@ -1277,14 +1283,14 @@ load_session:
     # Validate Energy <= MEL
     lw $t1, MEL
     lw $t2, current_energy
-    bgt $t2, $t1, load_fail
+    bgt $t2, $t1, ls__load_fail
 
     # --- PARSE CODE 2 ---
     move $a0, $v1 # Get terminator address
     addi $a0, $a0, 1 # Skip space
     jal str_to_int
     li $t0, -1
-    beq $v0, $t0, load_fail
+    beq $v0, $t0, ls__load_fail
 
     # Decrypt Code 2
     xori $t0, $v0, 0x87654321
@@ -1314,7 +1320,7 @@ load_session:
     addi $a0, $a0, 1
     jal str_to_int
     li $t0, -1
-    beq $v0, $t0, load_fail
+    beq $v0, $t0, ls__load_fail
 
     # Decrypt Code 3
     xori $t0, $v0, 0xAABBCCDD
@@ -1330,21 +1336,19 @@ load_session:
     la $a0, msg_load_success
     syscall
     li $v0, 1
-    j load_done
+    j ls__load_done
 
-load_fail:
+ls__load_fail:
     li $v0, 4
     la $a0, msg_load_invalid
     syscall
     li $v0, 0
 
-load_done:
+ls__load_done:
     lw $s0, 0($sp)
     lw $ra, 4($sp)
     addi $sp, $sp, 8
     jr $ra
-
-# DATA LAYER
 
 # ========================================
 # update_energy
@@ -1620,7 +1624,7 @@ str_to_int__loop:
     add $v0, $v0, $t0
 
     addi $a0, $a0, 1
-    j str_to_int_loop
+    j str_to_int__loop
 
 str_to_int__success:
     mul $v0, $v0, $t6 # Apply sign
