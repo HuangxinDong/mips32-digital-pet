@@ -23,6 +23,7 @@
     pet_sick:        .word   0
     pet_sleeping:    .word   0   # 0 = awake, 1 = sleeping
     level: 	         .word   1
+    level_up_flag:   .word   0   # 1 if level up happened in this turn
     positive_actions:.word   0   # count of positive commands
     total_positive_actions:.word 0 # total positive actions (will not reset when level up)
     total_time_alive:.word   0   # total seconds alive
@@ -33,11 +34,11 @@
     msg_title:      .asciiz "\n=== Digital Pet Simulator (MIPS32) ===\n"
     msg_init:       .asciiz "Initializing system...\n\n"
     msg_guide:      .asciiz "   __      _\n o'')}____//\n  `_/      )\n  (_(_/-(_/\n\n=== GAME GUIDE ===\nGameplay:\nInteract with your digital pet using various commands, \nand look forward to some unexpected surprises.\nMake sure to keep your pet's energy above 0!\n\nCommands:\n [F n] Feed      - Increase Energy +(1 * n)\n [E n] Entertain - Increase Energy +(2 * n)\n [P n] Pet       - Increase Energy +(2 * n)\n [I n] Ignore    - Decrease Energy -(3 * n)\n [S] Sleep       - Toggle Sleep Mode (Pauses depletion)\n [D] Date        - Go on a date (Level 2+ required)\n [C] Cure        - Cure sickness if sick\n [R] Reset       - Restart game\n [Q] Quit        - Save & Exit\n\nFeatures:\n - Level Up: Perform 5 positive actions to level up.\n - Sickness: Random chance to get sick. Cure with 'C'.\n - Sleep: Pet won't lose energy while sleeping.\n - Game Analytics: Every time the game ends or you save, \n   you'll get a game report along with your score.\n\n"
-    msg_params:     .asciiz "Please set parameters (press Enter for default):\n"
+    msg_params:     .asciiz "\nPlease set parameters (press Enter for default):\n"
     msg_edr_prompt: .asciiz "Enter Natural Energy Depletion Rate (EDR) [Default: 1]: "
     msg_mel_prompt: .asciiz "Enter Maximum Energy Level (MEL) [Default: 15]: "
     msg_iel_prompt: .asciiz "Enter Initial Energy Level (IEL) [Default: 5]: "
-    msg_params_set: .asciiz "Parameters set successfully!\n"
+    msg_params_set: .asciiz "\nParameters set successfully!\n"
     
     # Parameters Strings
     msg_edr_info:   .asciiz "- EDR: "
@@ -48,7 +49,7 @@
     msg_units_sec:  .asciiz " units/sec\n"
     
     msg_max_energy: .asciiz "\nError, maximum energy level reached! Capped to the Max.\n"
-    msg_alive:      .asciiz "Your Digital Pet is alive! Current status:\n"
+    msg_alive:      .asciiz "\nYour Digital Pet is alive! Current status:\n"
     msg_died1:       .asciiz "Error, energy level equal or less than 0. DP is dead!\n"
     msg_died2:       .asciiz " *** Your Digital Pet has died! ***\n"
     msg_dead_block:  .asciiz "Your pet is dead! You must Reset (R) or Quit (Q).\n"
@@ -68,7 +69,7 @@
     msg_cmd_quit:   .asciiz "\nCommand recognized: Quit "
     msg_cmd_cure:   .asciiz "\nCommand recognized: Cure "
     msg_cmd_invalid: .asciiz "Invalid command! Please try again."
-    msg_no_param:    .asciiz "No parameter provided. Defaulting to 1.\n"
+    msg_no_param:    .asciiz "\nNo parameter provided. Defaulting to 1.\n"
     msg_sleep:      .asciiz "Your pet is sleeping\n"
     msg_wake:       .asciiz "Your pet woke up\n"
     msg_cmd_dating: .asciiz "Command recognized: Dating\n"
@@ -98,7 +99,7 @@
  
     # Quit messages
     # Quit messages
-    msg_saving:     .asciiz "Saving session... goodbye!\nSave Code: "
+    msg_saving:     .asciiz "Saving session... goodbye!\n\nSave Code: "
     msg_terminated: .asciiz "\n--- simulation terminated ---\n"
 
     # Session Management
@@ -120,7 +121,7 @@
     msg_analysis_good:   .asciiz "Amazing job! You are a true Pet Master!\n"
     msg_analysis_bad:    .asciiz "Oh no... Your pet needs more love and care.\n"
     msg_analysis_avg:    .asciiz "Not bad! Keep going, there's still room to improve.\n"
-    msg_load_invalid: .asciiz "Invalid Save Code! Starting new game.\n\n"
+    msg_load_invalid: .asciiz "\nInvalid Save Code! Starting new game.\n"
     msg_limit_capped: .asciiz "Value too high! Please re-enter.\n"
     msg_percent:      .asciiz "%"
 
@@ -351,9 +352,16 @@ get_input:
     j main_loop
 
 execute_command:
+    # Reset level_up_flag
+    li $t0, 0
+    sw $t0, level_up_flag
+
     jal parse_command
     
     jal print_status_bar
+
+    # Check and print level up message AFTER status bar
+    jal check_print_level_up
 
     # Check if pet died during command execution
     lw $t0, pet_alive
@@ -982,19 +990,9 @@ increase_positive:
     addi $t2, $t2, 1
     sw  $t2, level
 
-    li  $v0, 4
-    la  $a0, newline
-    syscall
-    la  $a0, msg_level_up
-    syscall
-    
-    move $a0, $t2
-    li  $v0, 1
-    syscall
-    
-    li  $v0, 4
-    la  $a0, newline
-    syscall
+    # Set level_up_flag
+    li  $t0, 1
+    sw  $t0, level_up_flag
 
     # Increase MEL by 5
     lw  $t4, MEL
@@ -1019,6 +1017,38 @@ save_new_mel:
 save_bonus_energy:
     sw  $t5, current_energy
 
+    j inc_done
+
+inc_done:
+    jr $ra
+
+# ========================================
+# check_print_level_up
+#   Checks level_up_flag and prints messages
+# ========================================
+
+check_print_level_up:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+
+    lw $t0, level_up_flag
+    beq $t0, $zero, check_print_level_up_done
+
+    # Print Level Up
+    li  $v0, 4
+    la  $a0, newline
+    syscall
+    la  $a0, msg_level_up
+    syscall
+    
+    lw  $a0, level
+    li  $v0, 1
+    syscall
+    
+    li  $v0, 4
+    la  $a0, newline
+    syscall
+
     # Print Bonus
     li  $v0, 4
     la  $a0, msg_bonus
@@ -1033,21 +1063,27 @@ save_bonus_energy:
     li  $t6, 10
     beq $t2, $t6, print_milestone_10
     
-    j inc_done
+    j check_print_level_up_done
 
 print_milestone_5:
     li  $v0, 4
     la  $a0, msg_milestone_5
     syscall
-    j inc_done
+    j check_print_level_up_done
 
 print_milestone_10:
     li  $v0, 4
     la  $a0, msg_milestone_10
     syscall
-    j inc_done
+    j check_print_level_up_done
 
-inc_done:
+check_print_level_up_done:
+    # Reset flag
+    li $t0, 0
+    sw $t0, level_up_flag
+
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
     jr $ra
 
 # ========================================
@@ -1147,6 +1183,18 @@ dating_level_block:
 # ========================================
 
 quit:
+    li $v0, 4
+    la $a0, msg_cmd_quit
+    syscall
+    
+    li $a0, 46 # '.'
+    li $v0, 11
+    syscall
+
+    li $v0, 4
+    la $a0, newline
+    syscall
+
     li $v0, 4
     la $a0, msg_saving
     syscall
@@ -1256,29 +1304,35 @@ print_analytics:
     la $a0, msg_analysis_intro
     syscall
 
-    lw $t0, level
-    lw $t1, total_time_alive
-
-    # Check Good: Level >= 5 && Time >= 60
-    li $t2, 5
-    blt $t0, $t2, check_bad
-    li $t2, 60
-    blt $t1, $t2, check_bad
+    # Recalculate Score for analysis
+    lw $t0, total_time_alive
+    lw $t1, level
+    lw $t2, total_positive_actions
     
-    # Print Good
+    mul $t1, $t1, 50
+    mul $t2, $t2, 10
+    
+    add $t0, $t0, $t1
+    add $t0, $t0, $t2 # $t0 = Score
+
+    # Check Good: Score >= 500
+    li $t1, 500
+    bge $t0, $t1, print_good
+    
+    # Check Bad: Score <= 200
+    li $t1, 200
+    ble $t0, $t1, print_bad
+    
+    # Else Average
+    j print_avg
+
+print_good:
     li $v0, 4
     la $a0, msg_analysis_good
     syscall
     j analytics_done
 
-check_bad:
-    # Check Bad: Level <= 2 && Time <= 30
-    li $t2, 2
-    bgt $t0, $t2, print_avg
-    li $t2, 30
-    bgt $t1, $t2, print_avg
-
-    # Print Bad
+print_bad:
     li $v0, 4
     la $a0, msg_analysis_bad
     syscall
@@ -1453,14 +1507,26 @@ load_session:
     andi $t1, $t0, 0xFF
     sw $t1, EDR
 
-    # Validate Energy <= MEL
+    # VALIDATION CODE 1
+    # MEL > 0
     lw $t1, MEL
-    lw $t2, current_energy
+    blez $t1, ls__load_fail
+    
+    # IEL <= MEL
+    lw $t2, IEL
     bgt $t2, $t1, ls__load_fail
+    
+    # Energy <= MEL
+    lw $t3, current_energy
+    bgt $t3, $t1, ls__load_fail
 
-    # --- PARSE CODE 2 ---
-    move $a0, $v1 # Get terminator address
-    addi $a0, $a0, 1 # Skip space
+    # --- PREPARE FOR CODE 2 ---
+    move $a0, $v1 # Terminator from prev
+    jal skip_spaces_check_term
+    bnez $v0, ls__load_fail # If v0!=0, it means we hit end of string prematurely
+
+    # Parse Code 2
+    # a0 is already set by skip_spaces_check_term to the start of next token
     jal str_to_int
     li $t0, -1
     beq $v0, $t0, ls__load_fail
@@ -1493,9 +1559,26 @@ load_session:
     andi $t1, $t0, 0xFF
     sw $t1, sickness_count
 
-    # --- PARSE CODE 3 ---
+    # VALIDATION CODE 2
+    # Sick <= 1
+    lw $t1, pet_sick
+    li $t2, 1
+    bgt $t1, $t2, ls__load_fail
+    
+    # Sleep <= 1
+    lw $t1, pet_sleeping
+    bgt $t1, $t2, ls__load_fail
+    
+    # Level >= 1
+    lw $t1, level
+    blez $t1, ls__load_fail
+
+    # --- PREPARE FOR CODE 3 ---
     move $a0, $v1
-    addi $a0, $a0, 1
+    jal skip_spaces_check_term
+    bnez $v0, ls__load_fail
+
+    # Parse Code 3
     jal str_to_int
     li $t0, -1
     beq $v0, $t0, ls__load_fail
@@ -1504,10 +1587,15 @@ load_session:
     xori $t0, $v0, 0xAABBCCDD
     sw $t0, total_time_alive
 
-    # --- PARSE CODE 4 ---
+    # --- PREPARE FOR CODE 4 ---
     move $a0, $v1
-    addi $a0, $a0, 1
+    jal skip_spaces_check_term
+    bnez $v0, ls__load_fail
+
+    # Parse Code 4
     jal str_to_int
+    li $t0, -1
+    beq $v0, $t0, ls__load_fail
 
     # Decrypt Code 4
     xori $t0, $v0, 0x55667788
@@ -1537,6 +1625,33 @@ ls__load_done:
     addi $sp, $sp, 8
     jr $ra
 
+# Helper: skip_spaces_check_term
+# Input: $a0 = address to start checking
+# Output: $a0 = address of first non-space char
+#         $v0 = 0 if OK (found char), 1 if End of String (Fail)
+skip_spaces_check_term:
+    lb $t0, 0($a0)
+    li $t1, 32 # space
+    beq $t0, $t1, ssct__skip
+    
+    # Check terminators
+    li $t1, 10 # \n
+    beq $t0, $t1, ssct__fail
+    li $t1, 0  # null
+    beq $t0, $t1, ssct__fail
+    
+    # Found char
+    li $v0, 0
+    jr $ra
+
+ssct__skip:
+    addi $a0, $a0, 1
+    j skip_spaces_check_term
+
+ssct__fail:
+    li $v0, 1
+    jr $ra
+
 # ========================================
 # update_energy
 #   Increments energy by $a0 (n) * $a1
@@ -1544,49 +1659,60 @@ ls__load_done:
 # ========================================
 
 update_energy:
-    addi $sp, $sp, -12
-    sw $ra, 8($sp)
-    sw $s0, 4($sp) # to save n
-    sw $s1, 0($sp) # will save scale
+    addi $sp, $sp, -16
+    sw $ra, 12($sp)
+    sw $s0, 8($sp) # to save n
+    sw $s1, 4($sp) # will save scale
 
     move $s0, $a0
     move $s1, $a1
 
-    # print_update_energy
-    move $a0, $s0
-    move $a1, $s1
-    jal print_update_energy
-
-    # Calculate delta + update energy
+    # Calculate delta
     mul  $t0, $s0, $s1
 
     lw $t1, current_energy
     add $t1, $t1, $t0
 
     lw $t2, MEL
-    ble $t1, $t2, update_energy__check_min
+    
+    # Check Max Cap
+    bgt $t1, $t2, update_energy__capped
 
+    # Not capped: Print update message
+    # Save t1 (new energy) as print_update_energy uses t-regs
+    sw $t1, 0($sp)
+
+    move $a0, $s0
+    move $a1, $s1
+    jal print_update_energy
+
+    # Restore t1
+    lw $t1, 0($sp)
+
+    # Check Min (Death)
+    # If energy <= 0, pet dies.
+    bgt $t1, $zero, update_energy__save
+    
+    # Else, dead
+    li $t1, 0
+    sw $zero, pet_alive
+    j update_energy__save
+
+update_energy__capped:
     move $t1, $t2
     li $v0, 4
     la $a0, msg_max_energy
     syscall
     j update_energy__save
 
-update_energy__check_min:
-    bge $t1, $zero, update_energy__save
-    li $t1, 0
-    
-    # Set pet_alive to 0
-    sw $zero, pet_alive
-
 update_energy__save:
     sw $t1, current_energy
 
     # Restore and return
-    lw $s1, 0($sp)
-    lw $s0, 4($sp)
-    lw $ra, 8($sp)
-    addi $sp, $sp, 12
+    lw $s1, 4($sp)
+    lw $s0, 8($sp)
+    lw $ra, 12($sp)
+    addi $sp, $sp, 16
     jr $ra
 
 # ========================================
