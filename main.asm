@@ -78,6 +78,9 @@
     msg_happy: .asciiz "Your pet is happyly in love!\n"
     msg_calm:  .asciiz "Your pet feels calm today.\n"
     msg_sad:   .asciiz "Your pet feels a bit sad.\n"
+    msg_dating_marriage: .asciiz "DP is getting married! You didn't know pets could do that!\n(Sincerest congratulations to our team member, she is getting married today!)\n"
+    msg_dating_cat:      .asciiz "The date was awkward... the other pet turned out to be a cat!\n"
+    msg_dating_movie:    .asciiz "They went to see a movie and had a great time.\n"
     msg_level:      .asciiz "Level: "
     msg_level_up:   .asciiz "Level up! Current level: "
 
@@ -974,16 +977,24 @@ do_dating:
     li  $v0, 4
     syscall
 
-    # random mood: 0 / 1 / 2
+    # random mood: 0 to 5
     li  $v0, 42
     li  $a0, 0
-    li  $a1, 2
+    li  $a1, 6
     syscall
     move $t3, $a0
 
     beq $t3, $zero, dating_happy
     li  $t4, 1
     beq $t3, $t4, dating_calm
+    li  $t4, 2
+    beq $t3, $t4, dating_sad
+    li  $t4, 3
+    beq $t3, $t4, dating_marriage
+    li  $t4, 4
+    beq $t3, $t4, dating_cat
+    li  $t4, 5
+    beq $t3, $t4, dating_movie
 
 dating_sad:
     li  $v0, 4
@@ -995,6 +1006,26 @@ dating_calm:
     li  $v0, 4
     la  $a0, msg_calm
     syscall
+    j parse_done
+
+dating_marriage:
+    li  $v0, 4
+    la  $a0, msg_dating_marriage
+    syscall
+    jal increase_positive
+    j parse_done
+
+dating_cat:
+    li  $v0, 4
+    la  $a0, msg_dating_cat
+    syscall
+    j parse_done
+
+dating_movie:
+    li  $v0, 4
+    la  $a0, msg_dating_movie
+    syscall
+    jal increase_positive
     j parse_done
 
 dating_happy:
