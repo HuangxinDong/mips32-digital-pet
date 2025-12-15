@@ -74,6 +74,7 @@
     msg_cmd_dating: .asciiz "Command recognized: Dating\n"
     msg_dating_locked:.asciiz "Your pet is too young to date! Dating is locked. Reach level 2 first.\n"
     msg_sleep_block: .asciiz "Your pet is sleeping. Wake it up first.\n"
+    msg_pet_mumble:  .asciiz "DP mumbled in its sleep...\n"
     msg_happy: .asciiz "Your pet is happyly in love!\n"
     msg_calm:  .asciiz "Your pet feels calm today.\n"
     msg_sad:   .asciiz "Your pet feels a bit sad.\n"
@@ -671,6 +672,10 @@ check_cmd_type:
     li $t2, 'C'
     bne $s0, $t2, check_cmd_type_invalid
 
+    # Check sleep for Cure
+    lw $t3, pet_sleeping
+    bne $t3, $zero, cmd_sleep_block
+
     lw $t3, pet_sick
     beq $t3, $zero, check_cmd_type_invalid
 
@@ -686,7 +691,16 @@ check_cmd_type_invalid:
     syscall
     j parse_done
 
+cmd_sleep_block:
+    li $v0, 4
+    la $a0, msg_sleep_block
+    syscall
+    j parse_done
+
 do_feed:
+    lw $t0, pet_sleeping
+    bne $t0, $zero, cmd_sleep_block
+
     move $a1, $s1
     la $a0, msg_cmd_feed
     jal print_cmd_success
@@ -701,6 +715,9 @@ do_feed:
     j parse_done
 
 do_entertain:
+    lw $t0, pet_sleeping
+    bne $t0, $zero, cmd_sleep_block
+
     move $a1, $s1
     la $a0, msg_cmd_enter
     jal print_cmd_success
@@ -715,6 +732,9 @@ do_entertain:
     j parse_done
 
 do_pet:
+    lw $t0, pet_sleeping
+    bne $t0, $zero, do_pet_sleeping
+
     move $a1, $s1
     la $a0, msg_cmd_pet
     jal print_cmd_success
@@ -728,7 +748,16 @@ do_pet:
 
     j parse_done
 
+do_pet_sleeping:
+    li $v0, 4
+    la $a0, msg_pet_mumble
+    syscall
+    j parse_done
+
 do_ignore:
+    lw $t0, pet_sleeping
+    bne $t0, $zero, cmd_sleep_block
+
     move $a1, $s1
     la $a0, msg_cmd_ignore
     jal print_cmd_success
@@ -741,6 +770,9 @@ do_ignore:
     j parse_done
 
 do_reset:
+    lw $t0, pet_sleeping
+    bne $t0, $zero, cmd_sleep_block
+
     move $a0, $s1
     jal reset
     j parse_done
@@ -1454,7 +1486,6 @@ print_update_energy__val:
     syscall
 
 print_update_energy__done:
-    # end with a newline
     li $v0, 4
     la $a0, newline
     syscall
