@@ -64,6 +64,7 @@
     msg_cmd_quit:   .asciiz "Command recognized: Quit "
     msg_cmd_cure:   .asciiz "Command recognized: Cure "
     msg_cmd_invalid: .asciiz "Invalid command! Please try again."
+    msg_no_param:    .asciiz "No parameter provided. Defaulting to 1.\n"
     msg_sleep:      .asciiz "Your pet is sleeping\n"
     msg_wake:       .asciiz "Your pet woke up\n"
     msg_cmd_dating: .asciiz "Command recognized: Dating\n"
@@ -77,6 +78,8 @@
 
     # Reset and Ignore messages
     msg_reset_done:     .asciiz "Digital Pet has been reset to its initial state!\n"
+    msg_invalid_input: .asciiz "Invalid input! Using default value.\n"
+    msg_iel_error:     .asciiz "Error: Initial Energy (IEL) cannot be greater than Maximum Energy (MEL). Please re-enter.\n"
     
     # Time depletion messages
     msg_time_tick:      .asciiz "Time +1s... Natural energy depletion!\n"
@@ -90,7 +93,7 @@
     # Session Management
     msg_ask_load:     .asciiz "Do you want to restore a previous game? (Y/N) > "
     msg_load_instr:   .asciiz "Enter your Save Code:\n"
-    msg_load_example: .asciiz "Example: 17829342\n"
+    msg_load_example: .asciiz "Example: 322657394\n"
     msg_load_prompt:  .asciiz "> "
     msg_load_success: .asciiz "Game state restored successfully!\n"
     msg_load_invalid: .asciiz "Invalid Save Code! Starting new game.\n\n"
@@ -176,12 +179,25 @@ start_new_game:
     li $t9, 15
     jal read_config
 
+get_iel_loop:
     # Get IEL config
     la $a1, IEL
     la $a0, msg_iel_prompt
     li $t9, 10
     jal read_config
     
+    # Check IEL <= MEL
+    lw $t0, IEL
+    lw $t1, MEL
+    ble $t0, $t1, iel_ok
+    
+    # Print error
+    li $v0, 4
+    la $a0, msg_iel_error
+    syscall
+    j get_iel_loop
+
+iel_ok:
     # Initialise current_energy with IEL
     lw $t0, IEL
     sw $t0, current_energy
@@ -453,10 +469,15 @@ read_config:
     jal str_to_int
 
     li $t1, -1
-    beq $v0, $t1, use_default
+    beq $v0, $t1, invalid_input
 
     sw $v0, ($s1)
     j read_config_done
+
+invalid_input:
+    li $v0, 4
+    la $a0, msg_invalid_input
+    syscall
 
 use_default:
     sw $t9, ($s1)
@@ -513,6 +534,22 @@ parse_arg:
 
 use_default_arg:
     li $s1, 1 # n=1
+
+    # Check if command is F, E, P, I to print warning
+    li $t2, 'F'
+    beq $s0, $t2, warn_default
+    li $t2, 'E'
+    beq $s0, $t2, warn_default
+    li $t2, 'P'
+    beq $s0, $t2, warn_default
+    li $t2, 'I'
+    beq $s0, $t2, warn_default
+    j check_cmd_type
+
+warn_default:
+    li $v0, 4
+    la $a0, msg_no_param
+    syscall
 
 check_cmd_type:
     li $t2, 'F'
@@ -956,6 +993,10 @@ load_session:
     andi $t1, $t0, 0xFF
     sw $t1, MEL
     srl $t0, $t0, 8
+
+    # Validate Energy <= MEL
+    lw $t2, current_energy
+    bgt $t2, $t1, load_fail
     
     # Extract EDR
     andi $t1, $t0, 0xFF
