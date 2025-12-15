@@ -1572,14 +1572,15 @@ print_cmd_success:
 # ========================================
 # str_to_int
 #   converts ascii strings to integers
-#   gracefully catches invalid inputs (returns -1)
+#   catches invalid inputs (returns -1)
 # ========================================
 
 str_to_int:
-    # Update stack pointer
+    # prologue
     addi $sp, $sp, -4
     sw $ra, 0($sp)
 
+    # setting values to ensure valid 0-9 char
     li $v0, 0
     li $t1, 0
     li $t2, 10
@@ -1590,28 +1591,28 @@ str_to_int:
     # Check for negative sign
     lb $t0, ($a0)
     li $t3, 45 # '-'
-    bne $t0, $t3, str_to_int_loop
+    bne $t0, $t3, str_to_int__loop
     
-    # Found minus
+    # Execute if found a minus symbol
     li $t6, -1
     addi $a0, $a0, 1 # skip '-'
 
-str_to_int_loop:
+str_to_int__loop:
     lb $t0, ($a0)
 
     # Check terminators
     li $t3, 0
-    beq $t0, $t3, str_to_int_success
+    beq $t0, $t3, str_to_int__success
 
     li $t3, 10
-    beq $t0, $t3, str_to_int_success
+    beq $t0, $t3, str_to_int__success
 
     li $t3, 32  # space
-    beq $t0, $t3, str_to_int_success
+    beq $t0, $t3, str_to_int__success
 
-    # Check bounds
-    blt $t0, $t4, return_error
-    bgt $t0, $t5, return_error
+    # Check bounds of char to ensure ASCII 0-9
+    blt $t0, $t4, str_to_int__return_error
+    bgt $t0, $t5, str_to_int__return_error
 
     # Convert ASCII to INT
     sub $t0, $t0, $t4
@@ -1621,17 +1622,18 @@ str_to_int_loop:
     addi $a0, $a0, 1
     j str_to_int_loop
 
-str_to_int_success:
+str_to_int__success:
     mul $v0, $v0, $t6 # Apply sign
     move $v1, $a0 # Return address of terminator
-    j str_to_int_done
+    j str_to_int__done
 
-return_error:
+str_to_int__return_error:
+    # returns -1 if non-ASCII character is found
     li $v0, -1
-    j str_to_int_done
+    j str_to_int__done
 
-str_to_int_done:
-    # Restore Stack Pointer
+str_to_int__done:
+    # epilogue
     lw $ra, 0($sp)
     addi $sp, $sp, 4
     jr $ra
