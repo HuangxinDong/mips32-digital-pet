@@ -8,7 +8,7 @@
     # Global Variables & State
     EDR:            .word   1           # Energy Depletion Rate (units/sec)
     MEL:            .word   15          # Maximum Energy Level
-    IEL:            .word   10          # Initial Energy Level
+    IEL:            .word   5          # Initial Energy Level
     current_energy: .word   10          # Current energy (initialized to IEL)
     pet_alive:      .word   1           # 1 = Alive, 0 = Dead
     last_tick:      .word   0           # Timestamp of last energy update
@@ -34,7 +34,7 @@
     msg_params:     .asciiz "Please set parameters (press Enter for default):\n"
     msg_edr_prompt: .asciiz "Enter Natural Energy Depletion Rate (EDR) [Default: 1]: "
     msg_mel_prompt: .asciiz "Enter Maximum Energy Level (MEL) [Default: 15]: "
-    msg_iel_prompt: .asciiz "Enter Initial Energy Level (IEL) [Default: 10]: "
+    msg_iel_prompt: .asciiz "Enter Initial Energy Level (IEL) [Default: 5]: "
     msg_params_set: .asciiz "Parameters set successfully!\n"
     
     # Parameters Strings
