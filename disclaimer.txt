@@ -1,11 +1,18 @@
 Group C
 
 1. AI Disclaimer
-Large Language Models were used as a supplementary learning resource to assist in this project.
+Large Language Models were used as a supplementary learning resource to assist in this project, primarily for debugging assembly syntax and optimizing logic flow.
 
 2. Additional Features
-Sickness: The Pet is able to randomly get sick, which causes it to lose energy at twice the normal rate. It can be cured with 'C', but this command is not available when the Pet is not sick.
-Save/Load System: The user is able to save a game and load it later. This is achieved by using bitwise operations to compress game data into a single code, which can be used to load the saved game.
-Sleep: The user can make their pet sleep using the 'S' command for some time. This stops energy depletion, however, the pet cannot interact with the user in any other until the sleep cycle is complete.
-Levels:
-Dating:
+
+Sickness: The Pet is able to randomly get sick, which causes it to lose energy at twice the normal rate. It can be cured with 'C', but this command is not available when the Pet is not sick. This sick state doubles the energy depletion rate and necessitates user intervention via the 'Cure' command to restore normal gameplay.
+
+Save/Load System: Developed a serialization mechanism that packs game state variables (including energy, level, and most historical statistics) into a multipart integer sequence using bitwise shifting and masking. Data obfuscation is applied via XOR operations to simulate a secure save code.
+
+Sleep Mode: The user can make their pet sleep using the 'S' command for some time, and press 'S' again to wake it up. This feature pauses the natural energy depletion cycle. While active, standard interaction commands are inhibited to simulate rest, though specific non-intrusive interactions trigger unique feedback without altering game state.
+
+Leveling & Progression: Integrated a progression mechanic based on the accumulation of positive user interactions. Higher levels serve as prerequisites for unlocking advanced features and contribute to the final performance evaluation.
+
+Dating Simulation: An advanced interaction feature unlocked at Level 2. It utilizes pseudo-random number generation to determine diverse narrative outcomes—ranging from positive energy boosts to humorous "Easter egg" events—adding variety to the gameplay loop.
+
+Game Analytics: A post-session reporting module that aggregates runtime statistics (Time Alive, Total Actions, Sickness Count). It computes a composite score and provides qualitative feedback based on the player's performance metrics upon game termination.

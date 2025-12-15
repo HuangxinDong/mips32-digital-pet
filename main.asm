@@ -74,9 +74,13 @@
     msg_cmd_dating: .asciiz "Command recognized: Dating\n"
     msg_dating_locked:.asciiz "Your pet is too young to date! Dating is locked. Reach level 2 first.\n"
     msg_sleep_block: .asciiz "Your pet is sleeping. Wake it up first.\n"
+    msg_pet_mumble:  .asciiz "DP mumbled in its sleep...\n"
     msg_happy: .asciiz "Your pet is happyly in love!\n"
     msg_calm:  .asciiz "Your pet feels calm today.\n"
     msg_sad:   .asciiz "Your pet feels a bit sad.\n"
+    msg_dating_marriage: .asciiz "DP is getting married! You didn't know pets could do that!\n(Sincerest congratulations to our team member, she is getting married today!)\n"
+    msg_dating_cat:      .asciiz "The date was awkward... the other pet turned out to be a cat!\n"
+    msg_dating_movie:    .asciiz "They went to see a movie and had a great time.\n"
     msg_level:      .asciiz "Level: "
     msg_level_up:   .asciiz "Level up! Current level: "
 
@@ -671,6 +675,10 @@ check_cmd_type:
     li $t2, 'C'
     bne $s0, $t2, check_cmd_type_invalid
 
+    # Check sleep for Cure
+    lw $t3, pet_sleeping
+    bne $t3, $zero, cmd_sleep_block
+
     lw $t3, pet_sick
     beq $t3, $zero, check_cmd_type_invalid
 
@@ -686,7 +694,16 @@ check_cmd_type_invalid:
     syscall
     j parse_done
 
+cmd_sleep_block:
+    li $v0, 4
+    la $a0, msg_sleep_block
+    syscall
+    j parse_done
+
 do_feed:
+    lw $t0, pet_sleeping
+    bne $t0, $zero, cmd_sleep_block
+
     move $a1, $s1
     la $a0, msg_cmd_feed
     jal print_cmd_success
@@ -701,6 +718,9 @@ do_feed:
     j parse_done
 
 do_entertain:
+    lw $t0, pet_sleeping
+    bne $t0, $zero, cmd_sleep_block
+
     move $a1, $s1
     la $a0, msg_cmd_enter
     jal print_cmd_success
@@ -715,6 +735,9 @@ do_entertain:
     j parse_done
 
 do_pet:
+    lw $t0, pet_sleeping
+    bne $t0, $zero, do_pet_sleeping
+
     move $a1, $s1
     la $a0, msg_cmd_pet
     jal print_cmd_success
@@ -728,7 +751,16 @@ do_pet:
 
     j parse_done
 
+do_pet_sleeping:
+    li $v0, 4
+    la $a0, msg_pet_mumble
+    syscall
+    j parse_done
+
 do_ignore:
+    lw $t0, pet_sleeping
+    bne $t0, $zero, cmd_sleep_block
+
     move $a1, $s1
     la $a0, msg_cmd_ignore
     jal print_cmd_success
@@ -741,6 +773,9 @@ do_ignore:
     j parse_done
 
 do_reset:
+    lw $t0, pet_sleeping
+    bne $t0, $zero, cmd_sleep_block
+
     move $a0, $s1
     jal reset
     j parse_done
@@ -942,16 +977,24 @@ do_dating:
     li  $v0, 4
     syscall
 
-    # random mood: 0 / 1 / 2
+    # random mood: 0 to 5
     li  $v0, 42
     li  $a0, 0
-    li  $a1, 2
+    li  $a1, 6
     syscall
     move $t3, $a0
 
     beq $t3, $zero, dating_happy
     li  $t4, 1
     beq $t3, $t4, dating_calm
+    li  $t4, 2
+    beq $t3, $t4, dating_sad
+    li  $t4, 3
+    beq $t3, $t4, dating_marriage
+    li  $t4, 4
+    beq $t3, $t4, dating_cat
+    li  $t4, 5
+    beq $t3, $t4, dating_movie
 
 dating_sad:
     li  $v0, 4
@@ -963,6 +1006,26 @@ dating_calm:
     li  $v0, 4
     la  $a0, msg_calm
     syscall
+    j parse_done
+
+dating_marriage:
+    li  $v0, 4
+    la  $a0, msg_dating_marriage
+    syscall
+    jal increase_positive
+    j parse_done
+
+dating_cat:
+    li  $v0, 4
+    la  $a0, msg_dating_cat
+    syscall
+    j parse_done
+
+dating_movie:
+    li  $v0, 4
+    la  $a0, msg_dating_movie
+    syscall
+    jal increase_positive
     j parse_done
 
 dating_happy:
@@ -1454,7 +1517,6 @@ print_update_energy__val:
     syscall
 
 print_update_energy__done:
-    # end with a newline
     li $v0, 4
     la $a0, newline
     syscall
