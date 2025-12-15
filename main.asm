@@ -130,7 +130,7 @@
     msg_inc_by: .asciiz "Energy increased by: "
     msg_lparen: .asciiz " ("
     msg_x: .asciiz "x"
-    msg_rparen: .asciiz ").\n"
+    msg_rparen: .asciiz ")."
 
 .text
 .globl main
@@ -1369,7 +1369,6 @@ update_energy:
     # Calculate delta + update energy
     mul  $t0, $s0, $s1
 
-
     lw $t1, current_energy
     add $t1, $t1, $t0
 
@@ -1455,6 +1454,11 @@ print_update_energy__val:
     syscall
 
 print_update_energy__done:
+    # end with a newline
+    li $v0, 4
+    la $a0, newline
+    syscall
+
     jr $ra
     
 # DISPLAY FUNCTIONS
