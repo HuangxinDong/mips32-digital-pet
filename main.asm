@@ -1460,10 +1460,9 @@ print_update_energy__done:
     syscall
 
     jr $ra
-    
-# DISPLAY FUNCTIONS
+
 # ========================================
-# print_status_bar
+# print_status_bar (psb__)
 #   Output: [######---------] Energy: 6/15
 #   Converts the energy fraction into a display bar
 # ========================================
@@ -1475,49 +1474,49 @@ print_status_bar:
     lw $t1, MEL
     li $t2, 20 # Keeping the bar width to be 20 characters
 
-    bge $t0, $zero, calc_bar_ratio # Turns negative input into 0
+    bge $t0, $zero, psb__calc_bar_ratio # Turns negative input into 0
     li $t0, 0
         
     li  $v0, 4
     la  $a0, newline
     syscall
 
-calc_bar_ratio: 
-    # implementing the formula: (current energy * width of the bar) / MEL
+psb__calc_bar_ratio: 
+    # (current energy * width of the bar) / MEL
     mul $t3, $t0, $t2
     div $t3, $t1
     mflo $t3
 
-    ble $t3, $t2, draw_bar_start
+    ble $t3, $t2, psb__draw_bar_start
     li $t3, 20
 
-draw_bar_start:
+psb__draw_bar_start:
     li $v0, 4
     la $a0, energy_bar_start
     syscall
 
     move $t4, $t3
 
-print_fill_loop:
-    blez $t4, print_empty_start
+psb__print_fill_loop:
+    blez $t4, psb__print_empty_start
     li   $v0, 4
     la   $a0, energy_bar_fill
     syscall
     sub  $t4, $t4, 1
-    j    print_fill_loop
+    j    psb__print_fill_loop
 
-print_empty_start:
+psb__print_empty_start:
     sub $t4, $t2, $t3 # empty bars = bar width - no of filled bars
     
-print_empty_loop:
-    blez $t4, print_bar_end
+psb__print_empty_loop:
+    blez $t4, psb__print_bar_end
     li $v0, 4
     la $a0, energy_bar_empty
     syscall
     sub $t4, $t4, 1
-    j print_empty_loop
+    j psb__print_empty_loop
 
-print_bar_end:
+psb__print_bar_end:
     li $v0, 4
     la $a0, energy_bar_end
     syscall
@@ -1541,8 +1540,6 @@ print_bar_end:
     lw $ra, 0($sp)
     addi $sp, $sp, 4
     jr $ra
-
-# UTILITY FUNCTIONS
 
 # ========================================
 # print_cmd_success
