@@ -24,13 +24,15 @@
     pet_sleeping:    .word   0   # 0 = awake, 1 = sleeping
     level: 	         .word   1
     positive_actions:.word   0   # count of positive commands
+    total_positive_actions:.word 0 # total positive actions (will not reset when level up)
     total_time_alive:.word   0   # total seconds alive
+    sickness_count:  .word   0   # count of times pet got sick
 
 
     # Startup messages
     msg_title:      .asciiz "\n=== Digital Pet Simulator (MIPS32) ===\n"
     msg_init:       .asciiz "Initializing system...\n\n"
-    msg_guide:      .asciiz "   __      _\n o'')}____//\n  `_/      )\n  (_(_/-(_/\n\n=== GAME GUIDE ===\nGameplay:\nInteract with your digital pet using various commands, \nand look forward to some unexpected surprises.\nMake sure to keep your pet's energy above 0!\n\nCommands:\n [F n] Feed      - Increase Energy +(1 * n)\n [E n] Entertain - Increase Energy +(2 * n)\n [P n] Pet       - Increase Energy +(2 * n)\n [I n] Ignore    - Decrease Energy -(3 * n)\n [S] Sleep       - Toggle Sleep Mode (Pauses depletion)\n [D] Date        - Go on a date (Level 2+ required)\n [C] Cure        - Cure sickness if sick\n [R] Reset       - Restart game\n [Q] Quit        - Save & Exit\n\nFeatures:\n - Level Up: Perform 5 positive actions to level up.\n - Sickness: Random chance to get sick. Cure with 'C'.\n - Sleep: Pet won't lose energy while sleeping.\n\n"
+    msg_guide:      .asciiz "   __      _\n o'')}____//\n  `_/      )\n  (_(_/-(_/\n\n=== GAME GUIDE ===\nGameplay:\nInteract with your digital pet using various commands, \nand look forward to some unexpected surprises.\nMake sure to keep your pet's energy above 0!\n\nCommands:\n [F n] Feed      - Increase Energy +(1 * n)\n [E n] Entertain - Increase Energy +(2 * n)\n [P n] Pet       - Increase Energy +(2 * n)\n [I n] Ignore    - Decrease Energy -(3 * n)\n [S] Sleep       - Toggle Sleep Mode (Pauses depletion)\n [D] Date        - Go on a date (Level 2+ required)\n [C] Cure        - Cure sickness if sick\n [R] Reset       - Restart game\n [Q] Quit        - Save & Exit\n\nFeatures:\n - Level Up: Perform 5 positive actions to level up.\n - Sickness: Random chance to get sick. Cure with 'C'.\n - Sleep: Pet won't lose energy while sleeping.\n - Game Analytics: Every time the game ends or you save, \n   you'll get a game report along with your score.\n\n"
     msg_params:     .asciiz "Please set parameters (press Enter for default):\n"
     msg_edr_prompt: .asciiz "Enter Natural Energy Depletion Rate (EDR) [Default: 1]: "
     msg_mel_prompt: .asciiz "Enter Maximum Energy Level (MEL) [Default: 15]: "
@@ -45,7 +47,7 @@
     msg_units2:     .asciiz " units"
     msg_units_sec:  .asciiz " units/sec\n"
     
-    msg_max_energy: .asciiz "Error, maximum energy level reached! Capped to the Max.\n"
+    msg_max_energy: .asciiz "\nError, maximum energy level reached! Capped to the Max.\n"
     msg_alive:      .asciiz "Your Digital Pet is alive! Current status:\n"
     msg_died1:       .asciiz "Error, energy level equal or less than 0. DP is dead!\n"
     msg_died2:       .asciiz " *** Your Digital Pet has died! ***\n"
@@ -98,6 +100,19 @@
     msg_load_example: .asciiz "Example: 320882027 2271626018 2864434424\n"
     msg_load_prompt:  .asciiz "> "
     msg_load_success: .asciiz "Game state restored successfully!\n"
+
+    # Analytics
+    msg_analytics_title: .asciiz "\n=== Game Analytics ===\n"
+    msg_time_alive:      .asciiz "Total Time Alive: "
+    msg_seconds:         .asciiz " seconds\n"
+    msg_final_level:     .asciiz "Final Level: "
+    msg_pos_actions:     .asciiz "Positive Actions: "
+    msg_sickness_count:  .asciiz "Times Sick: "
+    msg_score:           .asciiz "Final Score: "
+    msg_analysis_intro:  .asciiz "Analysis: "
+    msg_analysis_good:   .asciiz "Amazing job! You are a true Pet Master!\n"
+    msg_analysis_bad:    .asciiz "Oh no... Your pet needs more love and care.\n"
+    msg_analysis_avg:    .asciiz "Not bad, but there is room for improvement.\n"
     msg_load_invalid: .asciiz "Invalid Save Code! Starting new game.\n\n"
 
     # Strings for displaying the energy bar
@@ -328,6 +343,10 @@ execute_command:
     
     jal print_status_bar
 
+    # Check if pet died during command execution
+    lw $t0, pet_alive
+    beq $t0, $zero, handle_death
+
     # Add newline between command output and time depletion
     li $v0, 4
     la $a0, newline
@@ -453,7 +472,11 @@ handle_death:
     li $v0, 4
     la $a0, msg_died2
     syscall
-    j    end_loop
+
+    # Show analytics on death
+    jal print_analytics
+
+    j    main_loop
 
 check_command_block:
     # Block commands if pet is dead (only allow R or Q)
@@ -783,6 +806,11 @@ do_check_sickness:
     li $t1, 1
     sw $t1, pet_sick
 
+    # Increment sickness count
+    lw $t2, sickness_count
+    addi $t2, $t2, 1
+    sw $t2, sickness_count
+
     li $v0, 4
     la $a0, msg_pet_sick
     syscall
@@ -862,6 +890,11 @@ increase_positive:
     lw  $t0, positive_actions
     addi $t0, $t0, 1
     sw  $t0, positive_actions
+
+    # Update total positive actions
+    lw  $t3, total_positive_actions
+    addi $t3, $t3, 1
+    sw  $t3, total_positive_actions
 
     li  $t1, 5
     blt $t0, $t1, inc_done
@@ -966,6 +999,9 @@ quit:
     # Save session
     jal save_session
 
+    # Show analytics on quit
+    jal print_analytics
+
     li $v0, 4
     la $a0, msg_terminated
     syscall
@@ -974,6 +1010,140 @@ quit:
 
 # SESSION FUNCTIONS
 
+# ========================================
+# print_analytics
+# ========================================
+print_analytics:
+    # Print Title
+    li $v0, 4
+    la $a0, msg_analytics_title
+    syscall
+
+    # Print Time Alive
+    li $v0, 4
+    la $a0, msg_time_alive
+    syscall
+
+    lw $a0, total_time_alive
+    li $v0, 1
+    syscall
+
+    li $v0, 4
+    la $a0, msg_seconds
+    syscall
+
+    # Print Final Level
+    li $v0, 4
+    la $a0, msg_final_level
+    syscall
+
+    lw $a0, level
+    li $v0, 1
+    syscall
+
+    li $v0, 4
+    la $a0, newline
+    syscall
+
+    # Print Positive Actions
+    li $v0, 4
+    la $a0, msg_pos_actions
+    syscall
+
+    lw $a0, total_positive_actions
+    li $v0, 1
+    syscall
+
+    li $v0, 4
+    la $a0, newline
+    syscall
+
+    # Print Sickness Count
+    li $v0, 4
+    la $a0, msg_sickness_count
+    syscall
+
+    lw $a0, sickness_count
+    li $v0, 1
+    syscall
+
+    li $v0, 4
+    la $a0, newline
+    syscall
+
+    # Calculate and Print Score
+    # Score = Time + (Level * 50) + (Total Actions * 10)
+    lw $t0, total_time_alive
+    lw $t1, level
+    lw $t2, total_positive_actions
+    
+    mul $t1, $t1, 50
+    mul $t2, $t2, 10
+    
+    add $t0, $t0, $t1
+    add $t0, $t0, $t2
+    
+    # Print Score
+    li $v0, 4
+    la $a0, msg_score
+    syscall
+    
+    move $a0, $t0
+    li $v0, 1
+    syscall
+    
+    li $v0, 4
+    la $a0, newline
+    syscall
+
+    # Analysis Logic
+    li $v0, 4
+    la $a0, msg_analysis_intro
+    syscall
+
+    lw $t0, level
+    lw $t1, total_time_alive
+
+    # Check Good: Level >= 5 && Time >= 60
+    li $t2, 5
+    blt $t0, $t2, check_bad
+    li $t2, 60
+    blt $t1, $t2, check_bad
+    
+    # Print Good
+    li $v0, 4
+    la $a0, msg_analysis_good
+    syscall
+    j analytics_done
+
+check_bad:
+    # Check Bad: Level <= 2 && Time <= 30
+    li $t2, 2
+    bgt $t0, $t2, print_avg
+    li $t2, 30
+    bgt $t1, $t2, print_avg
+
+    # Print Bad
+    li $v0, 4
+    la $a0, msg_analysis_bad
+    syscall
+    j analytics_done
+
+print_avg:
+    li $v0, 4
+    la $a0, msg_analysis_avg
+    syscall
+
+analytics_done:
+    li $v0, 4
+    la $a0, newline
+    syscall
+
+    jr $ra
+
+# ========================================
+# save_session
+# ========================================
 save_session:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
@@ -1215,9 +1385,9 @@ update_energy:
 update_energy__check_min:
     bge $t1, $zero, update_energy__save
     li $t1, 0
-    li $v0, 4
-    la $a0, msg_died1
-    syscall
+    
+    # Set pet_alive to 0
+    sw $zero, pet_alive
 
 update_energy__save:
     sw $t1, current_energy
@@ -1260,9 +1430,6 @@ print_update_energy__val:
     li $v0, 4
     la $a0, msg_units2
     syscall
-
-    li $t3, 1
-    beq $t1, $t3, print_update_energy__done
 
     li $v0, 4
     la $a0, msg_lparen
