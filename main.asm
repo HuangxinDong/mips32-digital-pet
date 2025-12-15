@@ -27,8 +27,9 @@
 
 
     # Startup messages
-    msg_title:      .asciiz "=== Digital Pet Simulator (MIPS32) ===\n"
+    msg_title:      .asciiz "\n=== Digital Pet Simulator (MIPS32) ===\n"
     msg_init:       .asciiz "Initializing system...\n\n"
+    msg_guide:      .asciiz "   __      _\n o'')}____//\n  `_/      )\n  (_(_/-(_/\n\n=== GAME GUIDE ===\nGameplay:\nInteract with your digital pet using various commands, \nand look forward to some unexpected surprises.\nMake sure to keep your pet's energy above 0!\n\nCommands:\n [F n] Feed      - Increase Energy +(1 * n)\n [E n] Entertain - Increase Energy +(2 * n)\n [P n] Pet       - Increase Energy +(2 * n)\n [I n] Ignore    - Decrease Energy -(3 * n)\n [S] Sleep       - Toggle Sleep Mode (Pauses depletion)\n [D] Date        - Go on a date (Level 2+ required)\n [C] Cure        - Cure sickness if sick\n [R] Reset       - Restart game\n [Q] Quit        - Save & Exit\n\nFeatures:\n - Level Up: Perform 5 positive actions to level up.\n - Sickness: Random chance to get sick. Cure with 'C'.\n - Sleep: Pet won't lose energy while sleeping.\n\n"
     msg_params:     .asciiz "Please set parameters (press Enter for default):\n"
     msg_edr_prompt: .asciiz "Enter Natural Energy Depletion Rate (EDR) [Default: 1]: "
     msg_mel_prompt: .asciiz "Enter Maximum Energy Level (MEL) [Default: 15]: "
@@ -129,6 +130,9 @@ main:
     la $a0, msg_init
     syscall
 
+    # Print Game Guide
+    la $a0, msg_guide
+    syscall
     
     # Ask to load session
     li $v0, 4
