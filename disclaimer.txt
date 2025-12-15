@@ -3,16 +3,28 @@ Group C
 1. AI Disclaimer
 Large Language Models were used as a supplementary learning resource to assist in this project, primarily for debugging assembly syntax and optimizing logic flow.
 
-2. Additional Features
+2. Core Features & System Robustness
+Core Mechanics: The simulation operates on a real-time energy depletion loop, requiring users to manage the pet's state through interactive commands (Feed, Entertain, Pet) that dynamically adjust energy levels.
 
-Sickness: The Pet is able to randomly get sick, which causes it to lose energy at twice the normal rate. It can be cured with 'C', but this command is not available when the Pet is not sick. This sick state doubles the energy depletion rate and necessitates user intervention via the 'Cure' command to restore normal gameplay.
+Input Validation: Rigorous validation logic ensures system stability. The system rejects non-numeric and negative inputs, enforces logical constraints (IEL ≤ MEL), and utilizes loop-based reprompting for invalid configuration attempts.
+
+Boundary Limits: To prevent integer overflow and ensure gameplay balance, strict upper limits are enforced:
+- Maximum Energy (MEL) & Initial Energy (IEL): Capped at 10,000.
+- Command Parameters: Capped at 100.
+- Energy Depletion Rate (EDR): Capped at 100.
+
+Visual Scalability: The UI employs a ratio-based rendering algorithm for the energy bar. Regardless of the numerical magnitude (up to 10,000), the system normalizes energy values to display a proportional 20-character progress bar, maintaining interface consistency.
+
+3. Additional Features
+
+Sickness Mechanism: Implemented a dynamic status effect where the pet has a probabilistic chance of contracting an illness. This state doubles the energy depletion rate and necessitates user intervention via the 'Cure' command to restore normal gameplay.
 
 Save/Load System: Developed a serialization mechanism that packs game state variables (including energy, level, and most historical statistics) into a multipart integer sequence using bitwise shifting and masking. Data obfuscation is applied via XOR operations to simulate a secure save code.
 
-Sleep Mode: The user can make their pet sleep using the 'S' command for some time, and press 'S' again to wake it up. This feature pauses the natural energy depletion cycle. While active, standard interaction commands are inhibited to simulate rest, though specific non-intrusive interactions trigger unique feedback without altering game state.
+Sleep Mode: Added a state management feature that pauses the natural energy depletion cycle. While active, standard interaction commands are inhibited to simulate rest, though specific non-intrusive interactions trigger unique feedback without altering game state.
 
 Leveling & Progression: Integrated a progression mechanic based on the accumulation of positive user interactions. Higher levels serve as prerequisites for unlocking advanced features and contribute to the final performance evaluation.
 
 Dating Simulation: An advanced interaction feature unlocked at Level 2. It utilizes pseudo-random number generation to determine diverse narrative outcomes—ranging from positive energy boosts to humorous "Easter egg" events—adding variety to the gameplay loop.
 
-Game Analytics: A post-session reporting module that aggregates runtime statistics (Time Alive, Total Actions, Sickness Count). It computes a composite score and provides qualitative feedback based on the player's performance metrics upon game termination.
+Game Analytics: A post-session reporting module that aggregates runtime statistics (Time Alive, Total Actions, Sickness Count). It computes a composite score (Final Score = Time Alive + Level*50 + Total Actions*10) and provides qualitative feedback based on the player's performance metrics upon game termination. 
