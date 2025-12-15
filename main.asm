@@ -104,7 +104,7 @@
     # Session Management
     msg_ask_load:     .asciiz "Do you want to restore a previous game? (Y/N) > "
     msg_load_instr:   .asciiz "Enter your Save Code:\n"
-    msg_load_example: .asciiz "Example: 320882027 2271626018 2864434424\n"
+    msg_load_example: .asciiz "Example: 322657394 2271494945 2864434397 1432778632\n"
     msg_load_prompt:  .asciiz "> "
     msg_load_success: .asciiz "Game state restored successfully!\n"
 
@@ -119,7 +119,7 @@
     msg_analysis_intro:  .asciiz "Analysis: "
     msg_analysis_good:   .asciiz "Amazing job! You are a true Pet Master!\n"
     msg_analysis_bad:    .asciiz "Oh no... Your pet needs more love and care.\n"
-    msg_analysis_avg:    .asciiz "Not bad! Keep going — there's still room to improve.\n"
+    msg_analysis_avg:    .asciiz "Not bad! Keep going, there's still room to improve.\n"
     msg_load_invalid: .asciiz "Invalid Save Code! Starting new game.\n\n"
 
     # Strings for displaying the energy bar
@@ -914,6 +914,9 @@ reset:
     sw  $t0, pet_sleeping
     sw  $t0, pet_sick
     sw  $t0, positive_actions
+    sw  $t0, total_positive_actions
+    sw  $t0, sickness_count
+    sw  $t0, total_time_alive
 
     li  $t1, 1
     sw  $t1, level
@@ -978,6 +981,12 @@ save_new_mel:
     # Add 5 to current energy as levelup bonus
     lw  $t5, current_energy
     addi $t5, $t5, 5
+    
+    # Check against new MEL ($t4 has the new MEL)
+    ble $t5, $t4, save_bonus_energy
+    move $t5, $t4
+
+save_bonus_energy:
     sw  $t5, current_energy
 
     # Print Bonus
@@ -1292,7 +1301,7 @@ save_session:
     li $a0, 32 # 32 is space
     syscall
 
-    # Save code part2: Sick, Sleep, Level, PosActs
+    # Save code part2: if Sick, if Sleep, Level, PosActs, SicknessCount
     li $t0, 0
     
     lw $t1, pet_sick
@@ -1309,6 +1318,12 @@ save_session:
     
     lw $t1, positive_actions
     andi $t1, $t1, 0xFFFF
+    or $t0, $t0, $t1
+
+    # Add Sickness Count (8 bits) at 24-31
+    lw $t1, sickness_count
+    andi $t1, $t1, 0xFF
+    sll $t1, $t1, 24
     or $t0, $t0, $t1
     
     xori $t0, $t0, 0x87654321
@@ -1329,6 +1344,18 @@ save_session:
     
     # Print Code 3
     li $v0, 36 # (unsigned)
+    move $a0, $t0
+    syscall
+
+    li $v0, 11
+    li $a0, 32
+    syscall
+
+    # Print save code p4: Total Positive Actions
+    lw $t0, total_positive_actions
+    xori $t0, $t0, 0x55667788
+    
+    li $v0, 36
     move $a0, $t0
     syscall
     
@@ -1430,6 +1457,11 @@ load_session:
     # Sick (1)
     andi $t1, $t0, 1
     sw $t1, pet_sick
+    srl $t0, $t0, 1
+
+    # Sickness Count (8)
+    andi $t1, $t0, 0xFF
+    sw $t1, sickness_count
 
     # --- PARSE CODE 3 ---
     move $a0, $v1
@@ -1441,6 +1473,15 @@ load_session:
     # Decrypt Code 3
     xori $t0, $v0, 0xAABBCCDD
     sw $t0, total_time_alive
+
+    # --- PARSE CODE 4 ---
+    move $a0, $v1
+    addi $a0, $a0, 1
+    jal str_to_int
+
+    # Decrypt Code 4
+    xori $t0, $v0, 0x55667788
+    sw $t0, total_positive_actions
 
     # Restore alive status
     lw $t1, current_energy
