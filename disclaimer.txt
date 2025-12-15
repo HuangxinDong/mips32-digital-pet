@@ -5,3 +5,7 @@ Large Language Models were used as a supplementary learning resource to assist i
 
 2. Additional Features
 Sickness: The Pet is able to randomly get sick, which causes it to lose energy at twice the normal rate. It can be cured with 'C', but this command is not available when the Pet is not sick.
+Save/Load System: The user is able to save a game and load it later. This is achieved by using bitwise operations to compress game data into a single code, which can be used to load the saved game.
+Sleep: The user can make their pet sleep using the 'S' command for some time. This stops energy depletion, however, the pet cannot interact with the user in any other until the sleep cycle is complete.
+Levels:
+Dating:
