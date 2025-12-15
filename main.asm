@@ -118,6 +118,8 @@
     msg_analysis_bad:    .asciiz "Oh no... Your pet needs more love and care.\n"
     msg_analysis_avg:    .asciiz "Not bad, but there is room for improvement.\n"
     msg_load_invalid: .asciiz "Invalid Save Code! Starting new game.\n\n"
+    msg_limit_capped: .asciiz "Value too high! Please re-enter.\n"
+    msg_percent:      .asciiz "%"
 
     # Strings for displaying the energy bar
 
@@ -192,12 +194,14 @@ start_new_game:
     la $a1, EDR
     la $a0, msg_edr_prompt
     li $t9, 1
+    li $t8, 100 # Limit EDR to 100
     jal read_config
 
     # Get MEL config
     la $a1, MEL
     la $a0, msg_mel_prompt
     li $t9, 15
+    li $t8, 10000 # Limit MEL to 10000
     jal read_config
 
 get_iel_loop:
@@ -205,6 +209,7 @@ get_iel_loop:
     la $a1, IEL
     la $a0, msg_iel_prompt
     li $t9, 10
+    li $t8, 10000 # Limit IEL to 10000
     jal read_config
     
     # Check IEL <= MEL
@@ -531,16 +536,21 @@ end_loop:
 # ========================================
 # read_config
 #   $a0: prompt address, $a1: variable address, $t9: default value
+#   $t8: max limit
 # ========================================
 
 read_config:
-    addi $sp, $sp, -8
-    sw $ra, 4($sp)
-    sw $s1, 0($sp)
+    addi $sp, $sp, -12
+    sw $ra, 8($sp)
+    sw $s1, 4($sp)
+    sw $s0, 0($sp)
 
     move $s1, $a1
+    move $s0, $a0
 
+read_config_loop:
     # print prompt in reg $a0
+    move $a0, $s0
     li $v0, 4
     syscall
 
@@ -567,8 +577,17 @@ read_config:
     li $t1, -1
     beq $v0, $t1, invalid_input
 
+    # Check Limit
+    bgt $v0, $t8, ask_again
+
     sw $v0, ($s1)
     j read_config_done
+
+ask_again:
+    li $v0, 4
+    la $a0, msg_limit_capped
+    syscall
+    j read_config_loop
 
 invalid_input:
     li $v0, 4
@@ -579,9 +598,10 @@ use_default:
     sw $t9, ($s1)
 
 read_config_done:
-    lw $s1, 0($sp)
-    lw $ra, 4($sp)
-    addi $sp, $sp, 8
+    lw $s0, 0($sp)
+    lw $s1, 4($sp)
+    lw $ra, 8($sp)
+    addi $sp, $sp, 12
     jr $ra
 
 # COMMAND PARSING
@@ -624,9 +644,19 @@ parse_arg:
     # Check for invalid input (-1)
     li $t2, -1
     beq $v0, $t2, check_cmd_type_invalid
+
+    # Check Limit for command param (100)
+    li $t2, 100
+    bgt $v0, $t2, reject_cmd_limit
     
     move $s1, $v0 # save integer to $s1
     j check_cmd_type
+
+reject_cmd_limit:
+    li $v0, 4
+    la $a0, msg_limit_capped
+    syscall
+    j parse_done
 
 use_default_arg:
     li $s1, 1 # n=1
@@ -1599,6 +1629,7 @@ psb__print_bar_end:
     li $v0, 1
     syscall
 
+psb__done:
     li $v0, 4
     la $a0, newline
     syscall
