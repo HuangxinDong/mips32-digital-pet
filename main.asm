@@ -8,7 +8,7 @@
     # Global Variables & State
     EDR:            .word   1           # Energy Depletion Rate (units/sec)
     MEL:            .word   15          # Maximum Energy Level
-    IEL:            .word   5          # Initial Energy Level
+    IEL:            .word   5           # Initial Energy Level
     current_energy: .word   10          # Current energy (initialized to IEL)
     pet_alive:      .word   1           # 1 = Alive, 0 = Dead
     last_tick:      .word   0           # Timestamp of last energy update
@@ -75,7 +75,7 @@
     msg_dating_locked:.asciiz "Your pet is too young to date! Dating is locked. Reach level 2 first.\n"
     msg_sleep_block: .asciiz "Your pet is sleeping. Wake it up first.\n"
     msg_pet_mumble:  .asciiz "DP mumbled in its sleep...\n"
-    msg_happy: .asciiz "Your pet is happyly in love!\n"
+    msg_happy: .asciiz "Your pet is happily in love!\n"
     msg_calm:  .asciiz "Your pet feels calm today.\n"
     msg_sad:   .asciiz "Your pet feels a bit sad.\n"
     msg_dating_marriage: .asciiz "DP is getting married! You didn't know pets could do that!\n(Sincerest congratulations to our team member, she is getting married today!)\n"
