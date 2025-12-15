@@ -33,7 +33,7 @@ Upon death or quitting, receive a detailed performance report:
 | :--- | :--- | :--- |
 | `F n` | **Feed**: Increase Energy by `1 * n` | `F 2` |
 | `E n` | **Entertain**: Increase Energy by `2 * n` | `E 1` |
-| `P n` | **Pet**: Increase Energy by `2 * n` | `P` |
+| `P n` | **Pet**: Increase Energy by `2 * n` | `P 3` |
 | `I n` | **Ignore**: Decrease Energy by `3 * n` | `I 1` |
 | `S` | **Sleep**: Toggle Sleep Mode (Pauses depletion) | `S` |
 | `C` | **Cure**: Cure sickness (if sick) | `C` |

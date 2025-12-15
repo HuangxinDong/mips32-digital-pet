@@ -23,6 +23,7 @@
     pet_sick:        .word   0
     pet_sleeping:    .word   0   # 0 = awake, 1 = sleeping
     level: 	         .word   1
+    level_up_flag:   .word   0   # 1 if level up happened in this turn
     positive_actions:.word   0   # count of positive commands
     total_positive_actions:.word 0 # total positive actions (will not reset when level up)
     total_time_alive:.word   0   # total seconds alive
@@ -351,9 +352,16 @@ get_input:
     j main_loop
 
 execute_command:
+    # Reset level_up_flag
+    li $t0, 0
+    sw $t0, level_up_flag
+
     jal parse_command
     
     jal print_status_bar
+
+    # Check and print level up message AFTER status bar
+    jal check_print_level_up
 
     # Check if pet died during command execution
     lw $t0, pet_alive
@@ -982,19 +990,9 @@ increase_positive:
     addi $t2, $t2, 1
     sw  $t2, level
 
-    li  $v0, 4
-    la  $a0, newline
-    syscall
-    la  $a0, msg_level_up
-    syscall
-    
-    move $a0, $t2
-    li  $v0, 1
-    syscall
-    
-    li  $v0, 4
-    la  $a0, newline
-    syscall
+    # Set level_up_flag
+    li  $t0, 1
+    sw  $t0, level_up_flag
 
     # Increase MEL by 5
     lw  $t4, MEL
@@ -1019,6 +1017,38 @@ save_new_mel:
 save_bonus_energy:
     sw  $t5, current_energy
 
+    j inc_done
+
+inc_done:
+    jr $ra
+
+# ========================================
+# check_print_level_up
+#   Checks level_up_flag and prints messages
+# ========================================
+
+check_print_level_up:
+    addi $sp, $sp, -4
+    sw $ra, 0($sp)
+
+    lw $t0, level_up_flag
+    beq $t0, $zero, check_print_level_up_done
+
+    # Print Level Up
+    li  $v0, 4
+    la  $a0, newline
+    syscall
+    la  $a0, msg_level_up
+    syscall
+    
+    lw  $a0, level
+    li  $v0, 1
+    syscall
+    
+    li  $v0, 4
+    la  $a0, newline
+    syscall
+
     # Print Bonus
     li  $v0, 4
     la  $a0, msg_bonus
@@ -1033,21 +1063,27 @@ save_bonus_energy:
     li  $t6, 10
     beq $t2, $t6, print_milestone_10
     
-    j inc_done
+    j check_print_level_up_done
 
 print_milestone_5:
     li  $v0, 4
     la  $a0, msg_milestone_5
     syscall
-    j inc_done
+    j check_print_level_up_done
 
 print_milestone_10:
     li  $v0, 4
     la  $a0, msg_milestone_10
     syscall
-    j inc_done
+    j check_print_level_up_done
 
-inc_done:
+check_print_level_up_done:
+    # Reset flag
+    li $t0, 0
+    sw $t0, level_up_flag
+
+    lw $ra, 0($sp)
+    addi $sp, $sp, 4
     jr $ra
 
 # ========================================
