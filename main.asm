@@ -1101,7 +1101,7 @@ print_update_energy__done:
 # DISPLAY FUNCTIONS
 # ========================================
 # print_status_bar
-#   Output: [======----] Energy: 6/15
+#   Output: [########----]
 #   Converts the energy fraction into a display bar
 # ========================================
 
