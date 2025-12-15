@@ -20,15 +20,17 @@
     newline:        .asciiz "\n"
     
     # Extra feature config
-    pet_sick:       .word   0
-    pet_sleeping:   .word   0   # 0 = awake, 1 = sleeping
-    level: 	    .word 1
-    positive_actions:.word 0   # count of positive commands
+    pet_sick:        .word   0
+    pet_sleeping:    .word   0   # 0 = awake, 1 = sleeping
+    level: 	         .word   1
+    positive_actions:.word   0   # count of positive commands
+    total_time_alive:.word   0   # total seconds alive
 
 
     # Startup messages
-    msg_title:      .asciiz "=== Digital Pet Simulator (MIPS32) ===\n"
+    msg_title:      .asciiz "\n=== Digital Pet Simulator (MIPS32) ===\n"
     msg_init:       .asciiz "Initializing system...\n\n"
+    msg_guide:      .asciiz "   __      _\n o'')}____//\n  `_/      )\n  (_(_/-(_/\n\n=== GAME GUIDE ===\nGameplay:\nInteract with your digital pet using various commands, \nand look forward to some unexpected surprises.\nMake sure to keep your pet's energy above 0!\n\nCommands:\n [F n] Feed      - Increase Energy +(1 * n)\n [E n] Entertain - Increase Energy +(2 * n)\n [P n] Pet       - Increase Energy +(2 * n)\n [I n] Ignore    - Decrease Energy -(3 * n)\n [S] Sleep       - Toggle Sleep Mode (Pauses depletion)\n [D] Date        - Go on a date (Level 2+ required)\n [C] Cure        - Cure sickness if sick\n [R] Reset       - Restart game\n [Q] Quit        - Save & Exit\n\nFeatures:\n - Level Up: Perform 5 positive actions to level up.\n - Sickness: Random chance to get sick. Cure with 'C'.\n - Sleep: Pet won't lose energy while sleeping.\n\n"
     msg_params:     .asciiz "Please set parameters (press Enter for default):\n"
     msg_edr_prompt: .asciiz "Enter Natural Energy Depletion Rate (EDR) [Default: 1]: "
     msg_mel_prompt: .asciiz "Enter Maximum Energy Level (MEL) [Default: 15]: "
@@ -48,21 +50,23 @@
     msg_died1:       .asciiz "Error, energy level equal or less than 0. DP is dead!\n"
     msg_died2:       .asciiz " *** Your Digital Pet has died! ***\n"
     msg_dead_block:  .asciiz "Your pet is dead! You must Reset (R) or Quit (Q).\n"
-    msg_pet_sick:   .asciiz "Your Digital Pet has gotten sick! Cure with 'C'!\n"
-    msg_cured:      .asciiz "You gave your Digital Pet medicine. It is cured!\n"
+    msg_pet_sick:   .asciiz "\nYour Digital Pet has gotten sick! Cure with 'C'!\n"
+    msg_cured:      .asciiz "\nYou gave your Digital Pet medicine. It is cured!\n"
     
     # Command prompt
-    msg_prompt:     .asciiz "\nEnter a command (F, E, P, I, D, S, R, Q) > "
+    msg_prompt:     .asciiz "\nEnter a command (F, E, P, I, S, R, Q) > "
+    msg_prompt_high:.asciiz "\nEnter a command (F, E, P, I, D, S, R, Q) > "
     
     # Command recognized messages
-    msg_cmd_feed:   .asciiz "Command recognized: Feed "
-    msg_cmd_enter:  .asciiz "Command recognized: Entertain "
-    msg_cmd_pet:    .asciiz "Command recognized: Pet "
-    msg_cmd_ignore: .asciiz "Command recognized: Ignore "
-    msg_cmd_reset:  .asciiz "Command recognized: Reset "
-    msg_cmd_quit:   .asciiz "Command recognized: Quit "
-    msg_cmd_cure:   .asciiz "Command recognized: Cure "
+    msg_cmd_feed:   .asciiz "\nCommand recognized: Feed "
+    msg_cmd_enter:  .asciiz "\nCommand recognized: Entertain "
+    msg_cmd_pet:    .asciiz "\nCommand recognized: Pet "
+    msg_cmd_ignore: .asciiz "\nCommand recognized: Ignore "
+    msg_cmd_reset:  .asciiz "\nCommand recognized: Reset "
+    msg_cmd_quit:   .asciiz "\nCommand recognized: Quit "
+    msg_cmd_cure:   .asciiz "\nCommand recognized: Cure "
     msg_cmd_invalid: .asciiz "Invalid command! Please try again."
+    msg_no_param:    .asciiz "No parameter provided. Defaulting to 1.\n"
     msg_sleep:      .asciiz "Your pet is sleeping\n"
     msg_wake:       .asciiz "Your pet woke up\n"
     msg_cmd_dating: .asciiz "Command recognized: Dating\n"
@@ -76,6 +80,8 @@
 
     # Reset and Ignore messages
     msg_reset_done:     .asciiz "Digital Pet has been reset to its initial state!\n"
+    msg_invalid_input: .asciiz "Invalid input! Using default value.\n"
+    msg_iel_error:     .asciiz "Error: Initial Energy (IEL) cannot be greater than Maximum Energy (MEL). Please re-enter.\n"
     
     # Time depletion messages
     msg_time_tick:      .asciiz "Time +1s... Natural energy depletion!\n"
@@ -89,7 +95,7 @@
     # Session Management
     msg_ask_load:     .asciiz "Do you want to restore a previous game? (Y/N) > "
     msg_load_instr:   .asciiz "Enter your Save Code:\n"
-    msg_load_example: .asciiz "Example: 17829342\n"
+    msg_load_example: .asciiz "Example: 320882027 2271626018 2864434424\n"
     msg_load_prompt:  .asciiz "> "
     msg_load_success: .asciiz "Game state restored successfully!\n"
     msg_load_invalid: .asciiz "Invalid Save Code! Starting new game.\n\n"
@@ -109,7 +115,7 @@
     msg_inc_by: .asciiz "Energy increased by: "
     msg_lparen: .asciiz " ("
     msg_x: .asciiz "x"
-    msg_rparen: .asciiz ")\n"
+    msg_rparen: .asciiz ").\n"
 
 .text
 .globl main
@@ -129,6 +135,9 @@ main:
     la $a0, msg_init
     syscall
 
+    # Print Game Guide
+    la $a0, msg_guide
+    syscall
     
     # Ask to load session
     li $v0, 4
@@ -172,12 +181,25 @@ start_new_game:
     li $t9, 15
     jal read_config
 
+get_iel_loop:
     # Get IEL config
     la $a1, IEL
     la $a0, msg_iel_prompt
     li $t9, 10
     jal read_config
     
+    # Check IEL <= MEL
+    lw $t0, IEL
+    lw $t1, MEL
+    ble $t0, $t1, iel_ok
+    
+    # Print error
+    li $v0, 4
+    la $a0, msg_iel_error
+    syscall
+    j get_iel_loop
+
+iel_ok:
     # Initialise current_energy with IEL
     lw $t0, IEL
     sw $t0, current_energy
@@ -188,8 +210,6 @@ start_new_game:
     syscall
 
 game_start_skip_config:
-    li $v0, 4
-    la $a0, msg_alive
     # Get Random Values
     li $v0, 30      # syscall 30 for system time
     syscall
@@ -239,24 +259,17 @@ game_start_skip_config:
     la $a0, msg_units
     syscall
 
-    # Print Current Energy
+    # Print alive msg and energy bar
     li $v0, 4
-    la $a0, msg_curr_energy
+    la $a0, msg_alive
     syscall
     
-    lw $a0, current_energy
-    li $v0, 1
-    syscall
-    
-    li $v0, 4
-    la $a0, newline
-    syscall
+    jal print_status_bar
 
     # Initialise last_tick with current time (ms)
     li  $v0, 30
     syscall
     sw  $a0, last_tick
-    
     
 # Main game loop
 
@@ -268,22 +281,74 @@ game_start_skip_config:
 # ========================================
 
 main_loop:
+    # Print command prompt based on level
+    lw $t0, level
+    li $t1, 2
+    bge $t0, $t1, prompt_high
+    
+    li $v0, 4
+    la $a0, msg_prompt
+    syscall
+    j get_input
 
+prompt_high:
+    li $v0, 4
+    la $a0, msg_prompt_high
+    syscall
+
+get_input:
+    # Read command input
+    li $v0, 8
+    la $a0, input_buffer
+    li $a1, 12
+    syscall
+
+    # COMMAND EXECUTION START
+    # Block commands if pet is dead (only allow R or Q)
+    lw $t0, pet_alive
+    bne $t0, $zero, execute_command
+
+    la $t1, input_buffer
+    lb $t2, 0($t1)
+
+    li $t3, 'R'
+    beq $t2, $t3, execute_command
+
+    li $t3, 'Q'
+    beq $t2, $t3, execute_command
+    
+    # Otherwise reject
+    li $v0, 4
+    la $a0, msg_dead_block
+    syscall
+    j main_loop
+
+execute_command:
+    jal parse_command
+    
+    jal print_status_bar
+
+    # Add newline between command output and time depletion
+    li $v0, 4
+    la $a0, newline
+    syscall
+
+    # --- NATURAL DEPLETION LOGIC START ---
     # (A) if pet is dead, skip depletion
     lw   $t0, pet_alive
-    beq  $t0, $zero, after_depletion
+    beq  $t0, $zero, main_loop
 
     # (A.1) if pet is sleeping, skip depletion
     lw   $t0, pet_sleeping
-    beq  $t0, $zero, do_depletion   # if awake → do normal depletion
-    j    sleep_skip_depletion       # if sleeping → skip
+    beq  $t0, $zero, do_depletion   # if awake -> do normal depletion
+    j sleep_skip_depletion       # if sleeping -> skip
 
 sleep_skip_depletion:
     # reset last_tick so time doesn't accumulate
     li  $v0, 30
     syscall
     sw  $a0, last_tick
-    j after_depletion
+    j end_loop
 
 do_depletion:
     # (B) check how many seconds passed since last_tick
@@ -298,77 +363,99 @@ do_depletion:
     div  $t3, $t4         # elapsed / 1000
     mflo $t7              # t7 = num_ticks (seconds passed)
 
-    blez $t7, after_depletion # if less than 1 second passed, skip
+    blez $t7, end_loop # if less than 1 second passed, skip
 
-    # (C) subtract EDR * num_ticks and update last_tick
-    lw   $t5, current_energy
-    lw   $t6, EDR
+    # Update total_time_alive
+    lw   $t8, total_time_alive
+    add  $t8, $t8, $t7
+    sw   $t8, total_time_alive
 
-    # Double EDR if pet is sick
-    lw $t9, pet_sick
-    beq $t9, $zero, main_loop_skip_sickness
-
-    mul $t6, $t6, 2
-
-main_loop_skip_sickness:
-    
-    mul  $t8, $t7, $t6    # t8 = total_damage = num_ticks * EDR
-    sub  $t5, $t5, $t8    # current_energy -= total_damage
-    bge $t5, $0, skip_clamp_natural
-    li $t5, 0
-
-skip_clamp_natural:
-    sw   $t5, current_energy
     # Update last_tick by adding (num_ticks * 1000)
     # This keeps the remainder milliseconds for the next loop (accuracy)
     mul  $t9, $t7, $t4    # t9 = time_accounted (ms)
     add  $t2, $t2, $t9    # last_tick += time_accounted
     sw   $t2, last_tick
 
-    # Print natural depletion message loop
-    move $t9, $t7        # t9 = num_ticks counter
+    # Prepare for loop
+    lw   $t6, EDR
+    lw   $t9, pet_sick
+    beq  $t9, $zero, depletion_loop_start
+    mul  $t6, $t6, 2
 
-print_tick_loop:
-    blez $t9, print_tick_done
+depletion_loop_start:
+    # $t7 is loop counter (num_ticks)
+    # $t6 is damage per tick
 
+depletion_loop:
+    blez $t7, depletion_done
+
+    # 1. Apply damage
+    lw   $t5, current_energy
+    sub  $t5, $t5, $t6
+    
+    # Clamp to 0
+    bge  $t5, $zero, save_energy_tick
+    li   $t5, 0
+save_energy_tick:
+    sw   $t5, current_energy
+
+    # print "Time +1s..."
     li   $v0, 4
     la   $a0, msg_time_tick
     syscall
 
+    # Print Status Bar
+    # Save registers $t6, $t7
+    addi $sp, $sp, -8
+    sw   $t7, 0($sp)
+    sw   $t6, 4($sp)
+    
+    jal  print_status_bar
+    
+    lw   $t6, 4($sp)
+    lw   $t7, 0($sp)
+    addi $sp, $sp, 8
+
     # check for sickness
-    addi $sp, $sp, -4
-    sw $t9, 0($sp)
+    addi $sp, $sp, -8
+    sw   $t7, 0($sp)
+    sw   $t6, 4($sp)
+    
+    jal  do_check_sickness
+    
+    lw   $t6, 4($sp)
+    lw   $t7, 0($sp)
+    addi $sp, $sp, 8
 
-    jal do_check_sickness
+    # Check death
+    lw   $t5, current_energy
+    blez $t5, handle_death_in_loop
 
-    lw $t9, 0($sp)
-    addi $sp, $sp, 4
+    # Decrement loop
+    sub  $t7, $t7, 1
+    j    depletion_loop
 
-    # end check for sickness
+handle_death_in_loop:
+    j    handle_death
 
-    sub  $t9, $t9, 1
-    j    print_tick_loop
+depletion_done:
+    j    end_loop
 
-print_tick_done:
-    jal print_status_bar
+handle_death:
+    li   $t7, 0
+    sw   $t7, current_energy
+    sw   $t7, pet_alive
 
-    # (D) if energy <= 0, clamp to 0, set pet_alive=0, print death messages
-    blez $t5, handle_death
-    j    after_depletion
-
-after_depletion:
-
-    # Print command prompt
     li $v0, 4
-    la $a0, msg_prompt
+    la $a0, msg_died1
     syscall
 
-    # Read command input
-    li $v0, 8
-    la $a0, input_buffer
-    li $a1, 12
+    li $v0, 4
+    la $a0, msg_died2
     syscall
+    j    end_loop
 
+check_command_block:
     # Block commands if pet is dead (only allow R or Q)
     lw  $t0, pet_alive
     bne $t0, $zero, allow_command
@@ -386,29 +473,31 @@ after_depletion:
     li  $v0, 4
     la  $a0, msg_dead_block
     syscall
-    j   main_loop
+    j   end_loop
 
 allow_command:
-
     jal parse_command
+    j end_loop
+
+end_loop:
+    # Print Level at the end of the loop
+    li  $v0, 4
+    la  $a0, newline
+    syscall
+
+    li  $v0, 4
+    la  $a0, msg_level
+    syscall
     
-    jal print_status_bar
+    lw  $a0, level
+    li  $v0, 1
+    syscall
+    
+    li  $v0, 4
+    la  $a0, newline
+    syscall
 
     j main_loop # --- END OF WHILE LOOP ---
-
-handle_death:
-    li   $t7, 0
-    sw   $t7, current_energy
-    sw   $t7, pet_alive
-
-    li   $v0, 4
-    la   $a0, msg_died1
-    syscall
-
-    li   $v0, 4
-    la   $a0, msg_died2
-    syscall
-    j after_depletion
 
 # INITIALIZE SYSTEM
 
@@ -449,10 +538,15 @@ read_config:
     jal str_to_int
 
     li $t1, -1
-    beq $v0, $t1, use_default
+    beq $v0, $t1, invalid_input
 
     sw $v0, ($s1)
     j read_config_done
+
+invalid_input:
+    li $v0, 4
+    la $a0, msg_invalid_input
+    syscall
 
 use_default:
     sw $t9, ($s1)
@@ -509,6 +603,22 @@ parse_arg:
 
 use_default_arg:
     li $s1, 1 # n=1
+
+    # Check if command is F, E, P, I to print warning
+    li $t2, 'F'
+    beq $s0, $t2, warn_default
+    li $t2, 'E'
+    beq $s0, $t2, warn_default
+    li $t2, 'P'
+    beq $s0, $t2, warn_default
+    li $t2, 'I'
+    beq $s0, $t2, warn_default
+    j check_cmd_type
+
+warn_default:
+    li $v0, 4
+    la $a0, msg_no_param
+    syscall
 
 check_cmd_type:
     li $t2, 'F'
@@ -868,9 +978,7 @@ save_session:
     addi $sp, $sp, -4
     sw $ra, 0($sp)
 
-    # Pack variables into one 32-bit integer
-    # Structure: [EDR (8)] [MEL (8)] [IEL (8)] [ENERGY (8)], since this ensures the number is positive (MSB=0) as long as EDR < 128
-    
+    # Save code part 1: EDR, MEL, IEL, Energy
     lw $t0, EDR
     sll $t0, $t0, 8 # Shift left 8
     
@@ -888,8 +996,53 @@ save_session:
     # Obfuscate with XOR Key (0x12345678)
     xori $t0, $t0, 0x12345678
     
-    # Print save code
-    li $v0, 36 # syscall 36: print unsigned integer
+    # Print save code part 1
+    li $v0, 36 # (unsigned)
+    move $a0, $t0
+    syscall
+    
+    # Print space
+    li $v0, 11
+    li $a0, 32 # 32 is space
+    syscall
+
+    # Save code part2: Sick, Sleep, Level, PosActs
+    li $t0, 0
+    
+    lw $t1, pet_sick
+    sll $t1, $t1, 23
+    or $t0, $t0, $t1
+    
+    lw $t1, pet_sleeping
+    sll $t1, $t1, 22
+    or $t0, $t0, $t1
+    
+    lw $t1, level
+    sll $t1, $t1, 16
+    or $t0, $t0, $t1
+    
+    lw $t1, positive_actions
+    andi $t1, $t1, 0xFFFF
+    or $t0, $t0, $t1
+    
+    xori $t0, $t0, 0x87654321
+    
+    # Print save code part2
+    li $v0, 36 # (unsigned)
+    move $a0, $t0
+    syscall
+
+    # Print Space
+    li $v0, 11
+    li $a0, 32
+    syscall
+
+    # Print save code p3: Time Alive
+    lw $t0, total_time_alive
+    xori $t0, $t0, 0xAABBCCDD
+    
+    # Print Code 3
+    li $v0, 36 # (unsigned)
     move $a0, $t0
     syscall
     
@@ -927,36 +1080,76 @@ load_session:
     li $t1, 0  # null
     beq $t0, $t1, load_fail
 
-    # Parse save code
+    # Parse save code1
     la $a0, input_buffer
     jal str_to_int
     li $t0, -1
     beq $v0, $t0, load_fail
     
-    # Decrypt: XOR with Key
+    # Decrypt code1: XOR with Key
     xori $t0, $v0, 0x12345678
     
-    # Unpack EDR MEL IEL ENERGY
+    # Unpack EDR MEL IEL ENERGY (code1)
 
     # Extract Energy
     andi $t1, $t0, 0xFF
     sw $t1, current_energy
     srl $t0, $t0, 8
-
-    # Extract IEL
     andi $t1, $t0, 0xFF
     sw $t1, IEL
     srl $t0, $t0, 8
-
-    # Extract MEL
     andi $t1, $t0, 0xFF
     sw $t1, MEL
     srl $t0, $t0, 8
-    
-    # Extract EDR
     andi $t1, $t0, 0xFF
     sw $t1, EDR
+
+    # Validate Energy <= MEL
+    lw $t1, MEL
+    lw $t2, current_energy
+    bgt $t2, $t1, load_fail
+
+    # --- PARSE CODE 2 ---
+    move $a0, $v1 # Get terminator address
+    addi $a0, $a0, 1 # Skip space
+    jal str_to_int
+    li $t0, -1
+    beq $v0, $t0, load_fail
+
+    # Decrypt Code 2
+    xori $t0, $v0, 0x87654321
+
+    # Unpack Code 2
+    # PosActs (16)
+    andi $t1, $t0, 0xFFFF
+    sw $t1, positive_actions
+    srl $t0, $t0, 16
     
+    # Level (6)
+    andi $t1, $t0, 0x3F
+    sw $t1, level
+    srl $t0, $t0, 6
+    
+    # Sleep (1)
+    andi $t1, $t0, 1
+    sw $t1, pet_sleeping
+    srl $t0, $t0, 1
+    
+    # Sick (1)
+    andi $t1, $t0, 1
+    sw $t1, pet_sick
+
+    # --- PARSE CODE 3 ---
+    move $a0, $v1
+    addi $a0, $a0, 1
+    jal str_to_int
+    li $t0, -1
+    beq $v0, $t0, load_fail
+
+    # Decrypt Code 3
+    xori $t0, $v0, 0xAABBCCDD
+    sw $t0, total_time_alive
+
     # Restore alive status
     lw $t1, current_energy
     li $t2, 0
@@ -1092,16 +1285,12 @@ print_update_energy__val:
     syscall
 
 print_update_energy__done:
-    li $v0, 4
-    la $a0, newline
-    syscall
-
     jr $ra
     
 # DISPLAY FUNCTIONS
 # ========================================
 # print_status_bar
-#   Output: [########----]
+#   Output: [######---------] Energy: 6/15
 #   Converts the energy fraction into a display bar
 # ========================================
 
@@ -1175,18 +1364,6 @@ print_bar_end:
     la $a0, newline
     syscall
     
-    li  $v0, 4
-    la  $a0, msg_level
-    syscall
-    
-    lw  $a0, level
-    li  $v0, 1
-    syscall
-    
-    li  $v0, 4
-    la  $a0, newline
-    syscall
-
     lw $ra, 0($sp)
     addi $sp, $sp, 4
     jr $ra
@@ -1234,19 +1411,29 @@ str_to_int:
     li $t2, 10
     li $t4, 48
     li $t5, 57
+    li $t6, 1 # Sign multiplier (default positive)
+
+    # Check for negative sign
+    lb $t0, ($a0)
+    li $t3, 45 # '-'
+    bne $t0, $t3, str_to_int_loop
+    
+    # Found minus
+    li $t6, -1
+    addi $a0, $a0, 1 # skip '-'
 
 str_to_int_loop:
     lb $t0, ($a0)
 
     # Check terminators
     li $t3, 0
-    beq $t0, $t3, str_to_int_done
+    beq $t0, $t3, str_to_int_success
 
     li $t3, 10
-    beq $t0, $t3, str_to_int_done
+    beq $t0, $t3, str_to_int_success
 
     li $t3, 32  # space
-    beq $t0, $t3, str_to_int_done
+    beq $t0, $t3, str_to_int_success
 
     # Check bounds
     blt $t0, $t4, return_error
@@ -1259,6 +1446,11 @@ str_to_int_loop:
 
     addi $a0, $a0, 1
     j str_to_int_loop
+
+str_to_int_success:
+    mul $v0, $v0, $t6 # Apply sign
+    move $v1, $a0 # Return address of terminator
+    j str_to_int_done
 
 return_error:
     li $v0, -1
