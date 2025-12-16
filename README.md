@@ -32,9 +32,9 @@ Upon death or quitting, receive a detailed performance report:
 | Command | Description | Example |
 | :--- | :--- | :--- |
 | `F n` | **Feed**: Increase Energy by `1 * n` | `F 2` |
-| `E n` | **Entertain**: Increase Energy by `2 * n` | `E 1` |
+| `E n` | **Entertain**: Increase Energy by `2 * n` | `E 2` |
 | `P n` | **Pet**: Increase Energy by `2 * n` | `P 3` |
-| `I n` | **Ignore**: Decrease Energy by `3 * n` | `I 1` |
+| `I n` | **Ignore**: Decrease Energy by `3 * n` | `I 2` |
 | `S` | **Sleep**: Toggle Sleep Mode (Pauses depletion) | `S` |
 | `C` | **Cure**: Cure sickness (if sick) | `C` |
 | `D` | **Date**: Go on a date (Requires Level 2+) | `D` |
@@ -44,7 +44,7 @@ Upon death or quitting, receive a detailed performance report:
 ## How to Run
 
 1.  **Prerequisites**: You need a MIPS simulator.
-    *   [MARS (MIPS Assembler and Runtime Simulator)](http://courses.missouristate.edu/KenVollmar/MARS/) is recommended.
+    *   [MARS (MIPS Assembler and Runtime Simulator)](https://computerscience.missouristate.edu/mars-mips-simulator.htm) is recommended.
 
 2.  **Steps**:
     *   Open `main.asm` in your simulator.
@@ -54,7 +54,7 @@ Upon death or quitting, receive a detailed performance report:
     *   Use commands to interact with your digital pet.
 
 ## Save Code Format
-The save system uses a 3-part integer code (e.g., `320882549 2271626018 2864434424`) which encodes:
+The save system uses a 4-part integer code which encodes:
 1.  **Game Config**: EDR, MEL, IEL, Current Energy.
 2.  **State**: Sickness, Sleep, Level, Positive Actions.
 3.  **Statistics**: Total Time Alive.
